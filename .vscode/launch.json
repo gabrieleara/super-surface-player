@@ -1,0 +1,27 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "C++ Launch",
+			"type": "cppdbg",
+			"request": "launch",
+			"program": "${workspaceRoot}/dist/super-surface-player",
+			"args": [],
+			/*"environment": [{"name": "squid", "value": "clam"}],*/
+			"cwd": "${workspaceRoot}/src",
+			"externalConsole": true,
+			"logging": {
+				"moduleLoad": false,
+				"trace": true
+			},
+			"stopAtEntry": false,
+			/*"customLaunchSetupCommands": [
+				{ "text": "target-run", "description": "run target", "ignoreFailures": false }
+			],*/
+			"linux": {
+				"MIMode": "gdb",
+				"miDebuggerPath": "/usr/bin/gdb"
+			}
+		}
+	]
+}

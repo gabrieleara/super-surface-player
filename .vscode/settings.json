@@ -1,0 +1,23 @@
+// Inserire le impostazioni in questo file per sovrascrivere quelle utente e predefinite.
+{
+    "editor.fontSize": 13,
+    "editor.renderWhitespace": "boundary",
+    "editor.cursorBlinking": "blink",
+    "editor.detectIndentation": true,
+    "editor.insertSpaces": false,
+    "editor.rulers": [
+        80
+    ],
+    "editor.wordWrap": "on",
+    "editor.wrappingIndent": "indent",
+    "editor.fontLigatures": true, // TODO: check if okay or not okay.
+    "editor.renderIndentGuides": true,
+    "files.autoSave": "afterDelay",
+    "files.autoSaveDelay": 60000,
+    "files.associations": {
+        "*.tcc": "cpp",
+        "system_error": "cpp"
+    },
+    "files.trimTrailingWhitespace": true,
+    "C_Cpp.intelliSenseEngine": "Default"
+}
