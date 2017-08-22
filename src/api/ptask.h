@@ -15,7 +15,7 @@
 
 #define PTASK_MAX	(50)
 
-typedef enum
+typedef enum __PTASK_ENUM
 {
 	PS_ERROR = -1,
 	PS_FREE = 0,
@@ -24,7 +24,7 @@ typedef enum
 	PS_JOINABLE
 } ptask_state_t;
 
-struct __PTASK
+typedef struct __PTASK_STRUCT
 {
 	int id;				// identificator of a ptask
 	long wcet;			// worst case execution time (in us): 0 means unknown
@@ -39,7 +39,7 @@ struct __PTASK
 
 	pthread_t _tid;		// pthread id of the task
 	pthread_attr_t _attr;// pthread params of the task
-};
+} ptask_t;
 
 
 typedef pthread_mutex_t ptask_mutex_t;
@@ -49,7 +49,7 @@ typedef pthread_cond_t ptask_cond_t;
 #define PTASK_CAB_MAX		(50)	// maximum number of cabs per process
 #define PTASK_CAB_MAX_SIZE	(10)	// maximum number of buffers inside a cab
 
-struct __PTASK_CAB
+typedef struct __PTASK_CAB
 {
 	int	id;							// identificator of the cab
 	int num_buffers;				// number of buffers in the cab
@@ -62,12 +62,9 @@ struct __PTASK_CAB
 	int last_index;					// pointer to the current last data buffer
 
 	ptask_mutex_t _mux;				// mutex semaphore used to access the cab
-};
+} ptask_cab_t;
 
-typedef struct __PTASK ptask_t;
 typedef void* (*ptask_body_t) (void*);
-
-typedef struct __PTASK_CAB ptask_cab_t;
 typedef int ptask_cab_id_t;
 
 //-------------------------------------------------------------
@@ -174,7 +171,7 @@ extern void ptask_wait_for_period(ptask_t *ptask);
 
 /*!
 	If the thread is still in execution after its deadline, it increments the
-	value of dmiss and returns true, otherwise returns false.
+	value of dmiss and returns a non zero value, otherwise returns zero.
 */
 extern int ptask_deadline_miss(ptask_t *ptask);
 
@@ -374,7 +371,7 @@ ptask_set_scheduler(SCHED_RR);
 // longer than the lifetime of the relative task
 ptask_t task0;
 
-if(ptask_short(&task0, 10000l, 20, 20, 1, task_body) < 0)
+if(ptask_short(&task0, 10000l, 20, 20, 1, task_body))
 {
 	printf("Something wrong happened!");
 	return -1;

@@ -1,5 +1,5 @@
-#ifndef SUPER_TIME_H
-#define SUPER_TIME_H
+#ifndef __TIME_H__
+#define __TIME_H__
 
 // Time management utility functions
 // Inspired by the functions shown by Professor Giorgio Buttazzo

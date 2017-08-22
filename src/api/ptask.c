@@ -13,7 +13,7 @@
 // GLOBAL PRIVATE VARIABLES
 //-------------------------------------------------------------
 
-static const struct __PTASK _ptask_new_task;
+static const ptask_t _ptask_new_task;
 									// Used to initialize new struct __PTASK
 
 static char _used_ids[PTASK_MAX];	// Stores for each id if it is in use or not

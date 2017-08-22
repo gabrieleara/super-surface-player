@@ -53,4 +53,7 @@ dkms.conf
 
 # Compiled program
 dist/*
+res/*
+*/res/*
+test_files/*
 

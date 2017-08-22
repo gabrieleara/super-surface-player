@@ -11,15 +11,15 @@
         "options": {
             "cwd": "${workspaceRoot}"
         },
-		"echoCommand": true,
+        "echoCommand": true,
         "tasks": [
-			{
-				"taskName": "build",
-				"args": [
-					"make"
-				],
-				"isBuildCommand": true
-			},
+            {
+                "taskName": "build",
+                "args": [
+                    "make"
+                ],
+                "isBuildCommand": true
+            },
             {
                 "taskName": "debug",
                 "args": [

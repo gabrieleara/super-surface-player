@@ -26,8 +26,8 @@
                 "/usr/include/x86_64-linux-gnu/c++/5.4.0",
                 "/usr/local/include",
                 "/usr/include",
-				"/usr/include/x86_64-linux-gnu",
-				"/usr/lib/gcc/x86_64-linux-gnu/5/include/",
+                "/usr/include/x86_64-linux-gnu",
+                "/usr/lib/gcc/x86_64-linux-gnu/5/include/",
                 "${workspaceRoot}"
             ],
             "defines": [],

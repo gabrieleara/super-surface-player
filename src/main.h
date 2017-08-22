@@ -1,15 +1,8 @@
 #ifndef MAIN_H
 #define MAIN_H
 
-//------------------------------------------------------------------------------
-// Each shared global variable will be declared here as an extern variable.
-// Actual definitions of such variables will be put in the related source file.
-//------------------------------------------------------------------------------
-
-
-//------------------------------------------------------------------------------
-// Functionalities provided by the related module to the other modules.
-//------------------------------------------------------------------------------
-
+extern void main_terminate_tasks();
+extern bool main_get_tasks_terminate();
+extern void abort_on_error(char* message);
 
 #endif

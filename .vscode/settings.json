@@ -16,8 +16,12 @@
     "files.autoSaveDelay": 60000,
     "files.associations": {
         "*.tcc": "cpp",
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "limits": "cpp",
+        "std_emu.h": "c",
+        "type_traits": "c"
     },
     "files.trimTrailingWhitespace": true,
-    "C_Cpp.intelliSenseEngine": "Default"
+    "C_Cpp.intelliSenseEngine": "Default",
+    "explorer.sortOrder": "type"
 }
