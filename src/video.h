@@ -7,12 +7,18 @@
  */
 
 /*
- * Initializes the graphic mode, by creating a new window and starting recording.
+ * Initializes the mutex and the other required data structures.
+ */
+extern int video_init();
+
+
+/*
+ * Initializes the graphic mode by creating a new window.
  */
 extern int gui_graphic_mode_init();
 
 /*
- * Destroys the window and removes all mouse and keyboard handlers.
+ * Destroys the window.
  */
 extern void gui_graphic_mode_exit();
 
@@ -22,6 +28,7 @@ extern void gui_graphic_mode_exit();
  */
 
 extern void* gui_task(void* arg);
+extern void* user_interaction_task(void* arg);
 
 
 #endif

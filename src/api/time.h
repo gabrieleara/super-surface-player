@@ -15,7 +15,7 @@ extern void time_copy(struct timespec *td, struct timespec ts);
 // Adds ms milliseconds to the value contained in t
 extern void time_add_ms(struct timespec *t, int ms);
 
-// Compares the two values contained in t1 and t1.
+// Compares the two values contained in t1 and t2.
 // Returns:
 //		1	if t1 > t2
 //	   -1	if t1 < t2

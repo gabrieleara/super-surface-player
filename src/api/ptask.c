@@ -380,7 +380,7 @@ void ptask_wait_for_period(ptask_t *ptask)
 
 /*!
 	If the thread is still in execution after its deadline, it increments the
-	value of dmiss and returns true, otherwise returns false.
+	value of dmiss and returns a non zero value, otherwise returns zero.
 */
 int ptask_deadline_miss(ptask_t *ptask)
 {

@@ -4,6 +4,7 @@
 #include <assert.h>
 
 #include "api/std_emu.h"
+#include "api/time.h"
 #include "api/ptask.h"
 
 #include "constants.h"
@@ -60,8 +61,29 @@ typedef struct __GUI_STRUCT
 	bool		initialized;	// Tells if this interface has been initialized
 								// i.e. all bitmaps are loaded and so on
 
+	bool		mouse_initialized;
+								// Tells if the mouse handler has been
+								// initialized
+	bool		mouse_shown;	// Tells if the show_mouse function has been
+								// called on the current screen
+
+	ptask_mutex_t mutex;		// This mutex is used to protect the access of
+								// the mouse flags
+
 	// TODO
 } gui_state_t;
+
+typedef enum __BUTTON_ID_ENUM
+{
+	BUTTON_INVALID = -1,
+	BUTTON_PLAY,
+	BUTTON_VOL_DOWN,
+	BUTTON_VOL_UP,
+	BUTTON_PAN_DOWN,
+	BUTTON_PAN_UP,
+	BUTTON_FRQ_DOWN,
+	BUTTON_FRQ_UP,
+} button_id_t;
 
 
 /* -----------------------------------------------------------------------------
@@ -72,6 +94,8 @@ typedef struct __GUI_STRUCT
 gui_state_t gui_state =
 {
 	.initialized = false,
+	.mouse_initialized = false,
+	.mouse_shown = false,
 	// TODO:
 };
 
@@ -268,6 +292,28 @@ void _draw_amplitude()
 	// TODO:
 }
 
+/*
+ * Calls Allegro show_mouse(screen) if the mouse module has been initialized,
+ * but only once.
+ */
+void _show_mouse()
+{
+bool result;
+
+	ptask_mutex_lock(&gui_state.mutex);
+
+	result = gui_state.mouse_initialized && !gui_state.mouse_shown;
+
+	if (result)
+		gui_state.mouse_shown = true;
+
+	ptask_mutex_unlock(&gui_state.mutex);
+
+	if (result)
+		show_mouse(screen);
+}
+
+
 void _screen_refresh()
 {
 	_draw_background();
@@ -279,6 +325,8 @@ void _screen_refresh()
 	_draw_amplitude();
 
 	blit(gui_state.virtual_screen, screen, 0, 0, 0, 0, WIN_MX, WIN_MY);
+
+	_show_mouse();
 }
 
 /*
@@ -291,6 +339,224 @@ void _close_button_proc()
 	main_terminate_tasks();
 }
 
+#define MAX_KEY_COMMANDS	256
+
+void _handle_num_key(int num)
+{
+	num = num == 0 ? 9 : num-1;
+
+	if (num < audio_get_num_files())
+	{
+		audio_play_file(num);
+	}
+}
+
+/*
+ * Checks if the user has given commands to the program while in graphic mode.
+ * Commands are specified by single key press.
+ */
+void _handle_keyboard_inputs()
+{
+int count;
+int key;
+int scancode;
+
+	for(count = 0; keypressed() && count < MAX_KEY_COMMANDS; count++)
+	{
+		key = readkey();
+
+		scancode = key >> 8;
+
+		if (scancode >= KEY_0 && scancode <= KEY_9)
+			_handle_num_key(scancode - KEY_0);
+		else
+		{
+			switch(key >> 8)
+			{
+			case KEY_Q:
+				main_terminate_tasks();
+				break;
+				// TODO: application volume up and down
+			default:
+				// Do nothing
+				break;
+			}
+		}
+	}
+
+	if (keypressed())
+	{
+		printf("UI_TASK: Too much keyboard commands!\r\n");
+	}
+}
+
+bool _is_mouse_in_side(int x, int y)
+{
+	return (x >= SIDE_X && x < SIDE_MX) && (y >= SIDE_Y && y < SIDE_MY);
+
+}
+
+int _get_element_id(int x, int y)
+{
+	if (_is_mouse_in_side(x, y))
+		return (y - SIDE_Y) / SIDE_ELEM_MY;
+
+	return -1;
+}
+
+button_id_t _get_button_id(int x, int y)
+{
+int relx, rely;	// Position relative to the element the mouse is in
+button_id_t id = BUTTON_INVALID;
+
+	if(!_is_mouse_in_side(x, y)) return BUTTON_INVALID;
+
+	relx = x - SIDE_X;
+
+	rely	= (y - SIDE_Y) % SIDE_ELEM_MY;
+
+	if (CHECK_BUTTON_POSX(relx, PLAY) && CHECK_BUTTON_POSY(rely, PLAY))
+	{
+		return BUTTON_PLAY;
+	}
+	else if (CHECK_BUTTON_POSY(rely, ROW))
+	{
+		// Mouse Y is compliant with the '+' or '-' buttons
+
+		if (CHECK_BUTTON_POSX(relx, VOL_DOWN))
+		{
+			id = BUTTON_VOL_DOWN;
+		}
+		else if (CHECK_BUTTON_POSX(relx, VOL_UP))
+		{
+			id = BUTTON_VOL_UP;
+		}
+		else if (CHECK_BUTTON_POSX(relx, PAN_DOWN))
+		{
+			id = BUTTON_PAN_DOWN;
+		}
+		else if (CHECK_BUTTON_POSX(relx, PAN_UP))
+		{
+			id = BUTTON_PAN_UP;
+		}
+		else if (CHECK_BUTTON_POSX(relx, FRQ_DOWN))
+		{
+			id = BUTTON_FRQ_DOWN;
+		}
+		else if (CHECK_BUTTON_POSX(relx, FRQ_UP))
+		{
+			id = BUTTON_FRQ_UP;
+		}
+	}
+
+	return id;
+}
+
+void _handle_click(int button_id, int element_id)
+{
+	switch(button_id)
+	{
+	case BUTTON_PLAY:
+		audio_play_file(element_id);
+		break;
+	case BUTTON_VOL_UP:
+		audio_volume_up(element_id);
+		break;
+	case BUTTON_VOL_DOWN:
+		audio_volume_down(element_id);
+		break;
+	case BUTTON_PAN_UP:
+		audio_panning_up(element_id);
+		break;
+	case BUTTON_PAN_DOWN:
+		audio_panning_down(element_id);
+		break;
+	case BUTTON_FRQ_UP:
+		audio_frequency_up(element_id);
+		break;
+	case BUTTON_FRQ_DOWN:
+		audio_frequency_down(element_id);
+		break;
+	default:
+		// Do nothing
+		break;
+	}
+}
+
+/*
+ * Checks if the user has pressed the mouse on any button on the screen and if
+ *so performs the requested action.
+ */
+void _handle_mouse_input()
+{
+int		pos, x, y, elem_id;
+bool	pressed;
+
+static button_id_t button_hover;
+static button_id_t button_hover_past = -1;
+
+static bool pressed_past = false;
+
+static struct timespec next_click_time;
+static struct timespec current_time;
+
+	if(poll_mouse() || !mouse_on_screen()) return;	// No mouse driver installed
+													// or mouse is not on screen
+
+	pos = mouse_pos;
+	pressed = BOOL(mouse_b & 1);
+
+	// TODO: move to macro
+	x = pos >> 16;
+	y = pos & 0x0000FFFF;
+
+	button_hover = _get_button_id(x, y);
+	elem_id = _get_element_id(x, y);
+
+	if (button_hover == BUTTON_INVALID)
+	{
+		// Do nothing
+	}
+	else if (button_hover != button_hover_past)
+	{
+		// On a different position, a button event is valid only if first click
+		if (pressed && !pressed_past)
+		{
+			_handle_click(button_hover, elem_id);
+			clock_gettime(CLOCK_MONOTONIC, &next_click_time);
+			time_add_ms(&next_click_time, 500); // TODO:
+		}
+	} else
+	{
+		if (pressed && !pressed_past)
+		{
+			// First click is handled
+			_handle_click(button_hover, elem_id);
+
+			clock_gettime(CLOCK_MONOTONIC, &next_click_time);
+			time_add_ms(&next_click_time, 500); // TODO:
+		} else if (pressed && pressed_past)
+		{
+			// On the same potion, if long press then timers come into game
+			clock_gettime(CLOCK_MONOTONIC, &current_time);
+
+			if (time_cmp(current_time, next_click_time) >= 0)
+			{
+				// Another click has to be handled, even if it is in fact a long
+				// press
+				_handle_click(button_hover, elem_id);
+
+				time_copy(&next_click_time, current_time);
+				time_add_ms(&next_click_time, 15); // TODO:
+			}
+		}
+	}
+
+	pressed_past = pressed;
+	button_hover_past = button_hover;
+
+}
+
 
 
 /* -----------------------------------------------------------------------------
@@ -299,50 +565,53 @@ void _close_button_proc()
  */
 
 /*
- * Initializes the graphic mode, by creating a new window and starting recording.
+ * Initializes the mutex and the other required data structures.
+ */
+int video_init()
+{
+int err;
+	err = ptask_mutex_init(&gui_state.mutex);
+	if (err) return err;
+
+	set_color_depth(COLOR_MODE);
+
+	return err;
+}
+
+// TODO: move the following functions in the private part
+
+/*
+ * Initializes the graphic mode by creating a new window.
  */
 int gui_graphic_mode_init()
 {
 int err;
 
-	err = install_keyboard(); if (err) return err;
-
-	set_color_depth(COLOR_MODE);
-
 	err = set_gfx_mode(GFX_AUTODETECT_WINDOWED, WIN_MX, WIN_MY, 0, 0);
 	if(err) return err;
 
-	err = install_mouse(); if(err < 0) return EPERM;
-
-	enable_hardware_cursor();
-	show_mouse(screen);
-
 	set_close_button_callback(_close_button_proc);
 
-	err = _static_interface_init(); if (err) return err;
+	err = _static_interface_init();
 
-	return 0;
+	return err;
 }
 
 /*
- * Destroys the window and removes all mouse and keyboard handlers.
+ * Destroys the window.
  */
 void gui_graphic_mode_exit()
 {
 #ifndef NDEBUG
 int err;
-#endif
-
-	remove_mouse();
-	remove_keyboard();
-
-#ifndef NDEBUG
+	// In debug mode, I assert that everything goes well.
 	err = set_gfx_mode(GFX_TEXT, 0, 0, 0, 0);
 	assert(err == 0);
 #else
 	set_gfx_mode(GFX_TEXT, 0, 0, 0, 0);
 #endif
 }
+
 
 /* -----------------------------------------------------------------------------
  * TASKS
@@ -383,3 +652,62 @@ int err;
 	return NULL;
 }
 
+
+
+void* user_interaction_task(void* arg) {
+ptask_t*	tp;			// task pointer
+int			task_id;	// task identifier
+
+// Local variables
+int err;
+
+	tp = STATIC_CAST(ptask_t*, arg);
+	task_id = ptask_get_id(tp);
+
+	// Variables initialization and initial computation
+
+	err = install_keyboard();
+	if (err)
+		abort_on_error("Could not initialize the keyboard.");
+
+	err = install_mouse();
+	if (err < 0)
+		abort_on_error("Could not initialize the mouse.");
+
+	enable_hardware_cursor();
+
+	ptask_mutex_lock(&gui_state.mutex);
+	gui_state.mouse_initialized = true;
+	ptask_mutex_unlock(&gui_state.mutex);
+
+	ptask_start_period(tp);
+
+	while (!main_get_tasks_terminate())
+	{
+		// TODO: mouse, many keyboard inputs
+
+		_handle_keyboard_inputs();
+
+		_handle_mouse_input();
+
+		if (ptask_deadline_miss(tp))
+			printf("TASK_UI missed %d deadlines!\r\n", ptask_get_dmiss(tp));
+
+		ptask_wait_for_period(tp);
+	}
+
+	// Cleanup
+	remove_mouse();
+	remove_keyboard();
+
+	audio_stop();
+
+	ptask_mutex_lock(&gui_state.mutex);
+
+	gui_state.mouse_initialized = false;
+	gui_state.mouse_shown = false;
+
+	ptask_mutex_unlock(&gui_state.mutex);
+
+	return NULL;
+}

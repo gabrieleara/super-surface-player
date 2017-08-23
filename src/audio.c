@@ -352,16 +352,14 @@ char* ret;
 
 	if (i >= audio_state.opened_audio_files)
 		return NULL;
-	else
-	{
-		ptask_mutex_lock(&audio_state.mutex);
 
-		ret = audio_state.audio_files[i].filename;
+	ptask_mutex_lock(&audio_state.mutex);
 
-		ptask_mutex_unlock(&audio_state.mutex);
+	ret = audio_state.audio_files[i].filename;
 
-		return ret;
-	}
+	ptask_mutex_unlock(&audio_state.mutex);
+
+	return ret;
 }
 
 int audio_get_volume(int i)
@@ -370,16 +368,14 @@ int ret;
 
 	if (i >= audio_state.opened_audio_files)
 		return -1;
-	else
-	{
-		ptask_mutex_lock(&audio_state.mutex);
 
-		ret = audio_state.audio_files[i].volume;
+	ptask_mutex_lock(&audio_state.mutex);
 
-		ptask_mutex_unlock(&audio_state.mutex);
+	ret = audio_state.audio_files[i].volume;
 
-		return ret;
-	}
+	ptask_mutex_unlock(&audio_state.mutex);
+
+	return ret;
 }
 
 int audio_get_panning(int i)
@@ -388,16 +384,14 @@ int ret;
 
 	if (i >= audio_state.opened_audio_files)
 		return -1;
-	else
-	{
-		ptask_mutex_lock(&audio_state.mutex);
 
-		ret = audio_state.audio_files[i].panning;
+	ptask_mutex_lock(&audio_state.mutex);
 
-		ptask_mutex_unlock(&audio_state.mutex);
+	ret = audio_state.audio_files[i].panning;
 
-		return ret;
-	}
+	ptask_mutex_unlock(&audio_state.mutex);
+
+	return ret;
 }
 
 int audio_get_frequency(int i)
@@ -406,16 +400,14 @@ int ret;
 
 	if (i >= audio_state.opened_audio_files)
 		return -1;
-	else
-	{
-		ptask_mutex_lock(&audio_state.mutex);
 
-		ret = audio_state.audio_files[i].frequency / 10;
+	ptask_mutex_lock(&audio_state.mutex);
 
-		ptask_mutex_unlock(&audio_state.mutex);
+	ret = audio_state.audio_files[i].frequency / 10;
 
-		return ret;
-	}
+	ptask_mutex_unlock(&audio_state.mutex);
+
+	return ret;
 }
 
 audio_type_t audio_get_type(int i)
@@ -438,14 +430,12 @@ void audio_set_volume(int i, int val)
 
 	if (i >= audio_state.opened_audio_files)
 		return;
-	else
-	{
-		ptask_mutex_lock(&audio_state.mutex);
 
-		audio_state.audio_files[i].volume = val;
+	ptask_mutex_lock(&audio_state.mutex);
 
-		ptask_mutex_unlock(&audio_state.mutex);
-	}
+	audio_state.audio_files[i].volume = val;
+
+	ptask_mutex_unlock(&audio_state.mutex);
 }
 
 void audio_set_panning(int i, int val)
@@ -455,14 +445,12 @@ void audio_set_panning(int i, int val)
 
 	if (i >= audio_state.opened_audio_files)
 		return;
-	else
-	{
-		ptask_mutex_lock(&audio_state.mutex);
 
-		audio_state.audio_files[i].panning = val;
+	ptask_mutex_lock(&audio_state.mutex);
 
-		ptask_mutex_unlock(&audio_state.mutex);
-	}
+	audio_state.audio_files[i].panning = val;
+
+	ptask_mutex_unlock(&audio_state.mutex);
 }
 
 void audio_set_frequency(int i, int val)
@@ -473,13 +461,104 @@ void audio_set_frequency(int i, int val)
 
 	if (i >= audio_state.opened_audio_files)
 		return;
-	else
-	{
-		ptask_mutex_lock(&audio_state.mutex);
 
-		audio_state.audio_files[i].frequency = val;
+	ptask_mutex_lock(&audio_state.mutex);
 
-		ptask_mutex_unlock(&audio_state.mutex);
-	}
+	audio_state.audio_files[i].frequency = val;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+
 }
 
+/*
+ * Modifiers functions
+ */
+void audio_volume_up(int i)
+{
+	if (i >= audio_state.opened_audio_files)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	++audio_state.audio_files[i].volume;
+
+	if (audio_state.audio_files[i].volume > MAX_VOL)
+		audio_state.audio_files[i].volume = MAX_VOL;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_volume_down(int i)
+{
+	if (i >= audio_state.opened_audio_files)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	--audio_state.audio_files[i].volume;
+
+	if (audio_state.audio_files[i].volume < MIN_VOL)
+		audio_state.audio_files[i].volume = MIN_VOL;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_panning_up(int i)
+{
+	if (i >= audio_state.opened_audio_files)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	++audio_state.audio_files[i].panning;
+
+	if (audio_state.audio_files[i].panning > CRX_PAN)
+		audio_state.audio_files[i].panning = CRX_PAN;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_panning_down(int i)
+{
+	if (i >= audio_state.opened_audio_files)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	--audio_state.audio_files[i].panning;
+
+	if (audio_state.audio_files[i].panning < CLX_PAN)
+		audio_state.audio_files[i].panning = CLX_PAN;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_frequency_up(int i)
+{
+	if (i >= audio_state.opened_audio_files)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	audio_state.audio_files[i].frequency += 10;
+
+	if (audio_state.audio_files[i].frequency > MAX_FREQ)
+		audio_state.audio_files[i].frequency = MAX_FREQ;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_frequency_down(int i)
+{
+	if (i >= audio_state.opened_audio_files)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	audio_state.audio_files[i].frequency -= 10;
+
+	if (audio_state.audio_files[i].frequency < MIN_FREQ)
+		audio_state.audio_files[i].frequency = MIN_FREQ;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}

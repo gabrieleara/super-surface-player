@@ -371,8 +371,6 @@ int start_gui_task()
 
 int start_ui_task()
 {
-	/*
-	// TODO:
 	return
 		ptask_short(
 			&main_state.tasks[TASK_UI],
@@ -381,7 +379,6 @@ int start_ui_task()
 			TASK_UI_DEADLINE,
 			GET_PRIO(TASK_UI_PRIORITY),
 			user_interaction_task); // FIXME: define this task
-	*/
 	return 0;
 }
 
@@ -565,8 +562,12 @@ int err;
 	err = audio_init();
 	if (err) return err;
 
+	// Video module initialization
+	err = video_init();
+	if (err) return err;
+
 	// Initializing semaphores
-	ptask_mutex_init(&main_state.mutex);
+	ptask_mutex_init(&main_state.mutex); // TODO: err
 	ptask_cond_init(&main_state.cond);
 
 	return 0;

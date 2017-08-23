@@ -79,6 +79,21 @@ extern void audio_set_panning(int i, int val);
 
 extern void audio_set_frequency(int i, int val);
 
+/*
+ * Modifiers functions
+ */
+extern void audio_volume_up(int i);
+
+extern void audio_volume_down(int i);
+
+extern void audio_panning_up(int i);
+
+extern void audio_panning_down(int i);
+
+extern void audio_frequency_up(int i);
+
+extern void audio_frequency_down(int i);
+
 /* -----------------------------------------------------------------------------
  * TASKS
  * -----------------------------------------------------------------------------

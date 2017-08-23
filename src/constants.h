@@ -98,6 +98,37 @@
 
 
 
+// BUTTONS, NOTICE: these values are relative to the elem position!
+
+#define BUTTON_PLAY_X		(360)
+#define BUTTON_PLAY_Y		(10)
+#define BUTTON_PLAY_MX		(374)
+#define BUTTON_PLAY_MY		(30)
+
+#define BUTTON_ROW_Y		(50)
+#define BUTTON_ROW_MY		(66)
+
+#define BUTTON_VOL_DOWN_X	(40)
+#define BUTTON_VOL_DOWN_MX	(56)
+#define BUTTON_PAN_DOWN_X	(40 + 128)
+#define BUTTON_PAN_DOWN_MX	(56 + 128)
+#define BUTTON_FRQ_DOWN_X	(40 + 256)
+#define BUTTON_FRQ_DOWN_MX	(56 + 256)
+
+#define BUTTON_VOL_UP_X		(102)
+#define BUTTON_VOL_UP_MX	(118)
+#define BUTTON_PAN_UP_X		(102 + 128)
+#define BUTTON_PAN_UP_MX	(118 + 128)
+#define BUTTON_FRQ_UP_X		(102 + 256)
+#define BUTTON_FRQ_UP_MX	(118 + 256)
+
+#define PASTER(button, dim) BUTTON_ ## button ## _ ## dim
+#define CHECK_BUTTON_POSY(posy, button) (posy >= PASTER(button,Y) && posy < PASTER(button,MY))
+#define CHECK_BUTTON_POSX(posx, button) (posx >= PASTER(button,X) && posx < PASTER(button,MX))
+
+
+
+
 /*
 	 __________________________________________________________
 	|                                           |              |
@@ -184,8 +215,8 @@
 // USER INTERACTION TASK
 
 #define TASK_UI_WCET		(WCET_UNKNOWN)
-#define TASK_UI_PERIOD		(30)	// same as gui TODO: change
-#define TASK_UI_DEADLINE	(30)	// TODO: same as period?
+#define TASK_UI_PERIOD		(10)	// TODO: change
+#define TASK_UI_DEADLINE	(10)	// TODO: same as period?
 #define TASK_UI_PRIORITY	(2)		// TODO: change
 
 // MICROPHONE TASK
@@ -195,11 +226,6 @@
 #define TASK_MIC_DEADLINE	(8)		// TODO: same as period?
 #define TASK_MIC_PRIORITY	(2)		// TODO: change
 
-// MICROPHONE TASK
-
-#define TASK_MIC_WCET		(WCET_UNKNOWN)
-#define TASK_MIC_PERIOD		(8)		// TODO: decide
-#define TASK_MIC_DEADLINE	(8)		// TODO: same as period?
-#define TASK_MIC_PRIORITY	(2)		// TODO: change
-
+// TODO: FFT TASK
+// TODO: ANALYSIS TASK
 #endif
