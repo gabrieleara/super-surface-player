@@ -76,12 +76,29 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 	// TODO: pointer of the SAMPLE of recognized sound
 } audio_file_desc_t;
 
+typedef struct __AUDIO_RECORD_INFO_STRUCT
+{
+	int cap_bits;		// Tells which kind of bit encoding the system supports
+	int cap_stereo;		// Tells if the system is capable of recording stereo
+						// input
+	int max_frequency;	// Tells the maximum possible sample frequency
+} audio_record_info_t;
+
+typedef struct __AUDIO_RECORD_STRUCT
+{
+	audio_record_info_t info;
+							// Contains all the info about the recording module
+							// support
+} audio_record_t;
+
 // Global state of the module
 typedef struct __AUDIO_STRUCT
 {
 	audio_file_desc_t audio_files[MAX_AUDIO_FILES];
 							// Array of opened audio files for reproduction
 	int opened_audio_files;	// Number of currently opened audio files
+
+	audio_record_t record;	// Contains all the data needed to record
 
 	ptask_mutex_t mutex;	// TODO: mutex to access this data structure
 } audio_state_t;
@@ -154,13 +171,73 @@ int		len;
 
 /* ------- UNSAFE FUNCTIONS - CALL ONLY IN SINGLE THREAD ENVIRONMENT -------- */
 
+#define AUDIO_INPUT_MONO	0
+#define AUDIO_INPUT_STEREO	1
+
 /*
  * Initializes the mutex TODO: and the other required data structures.
  */
 int audio_init()
 {
 int err;
+int cap_bits;		// Tells which kind of bit encoding the system supports
+int cap_stereo;		// Tells if the system is capable of recording stereo input
+int max_frequency;	// Tells the maximum possible sample frequency
+
 	err = ptask_mutex_init(&audio_state.mutex);
+	if (err) return err;
+
+	// Allegro sound initialization
+	err = install_sound(DIGI_AUTODETECT, MIDI_AUTODETECT, NULL); // TODO: MIDI
+	if (err) return err;
+
+	// FIXME: SOUND INPUT DOES NOT WORK!
+
+	// TODO: GABRI GUARDA QUA: rimuovi l'inizio del commento alla prossima riga
+	// Per riabilitare l'input del microfono
+/*
+	err = install_sound_input(DIGI_AUTODETECT, MIDI_NONE);
+	if (err) return err;
+/*
+	cap_bits = get_sound_input_cap_bits();
+	if (cap_bits == 0)
+	{
+		// No audio input is supported, should not be possibile, since
+		// install_sound_input returned a zero value.
+		assert(false);
+		return EINVAL;
+
+	}
+	else if (cap_bits & 16)
+	{
+		// We can have sixteen bit audio input. Good.
+		// TODO:
+
+		max_frequency = get_sound_input_cap_rate(16, AUDIO_INPUT_MONO);
+	}
+	else if (cap_bits & 8)
+	{
+		max_frequency = get_sound_input_cap_rate(8, AUDIO_INPUT_MONO);
+
+		// We can have only eight bit audio input. Not so good.
+		return EINVAL; // TODO: currently not supported
+	}
+
+	cap_stereo = get_sound_input_cap_stereo();
+
+	audio_state.record.info.cap_bits = cap_bits;
+	audio_state.record.info.cap_stereo = cap_stereo;
+	audio_state.record.info.max_frequency = max_frequency;
+
+	printf("\r\nAudio module settings:\r\n");
+	printf("- cap_bits = %d\r\n", cap_bits);
+	printf("- cap_stereo = %d\r\n", cap_stereo);
+	printf("- max_frequency = %d\r\n\r\n", max_frequency);
+
+	// TODO: put the following in another function, activated by a command in text mode:
+	// get_sound_input_cap_parm(int rate, int bits, int stereo);
+
+	*/
 	return err;
 }
 

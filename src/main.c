@@ -554,8 +554,7 @@ int err;
 	err = allegro_init();
 	if (err) return err;
 
-	// Sound initialization
-	err = install_sound(DIGI_AUTODETECT, MIDI_AUTODETECT, NULL);
+	err = install_timer();
 	if (err) return err;
 
 	// Audio module initialization
