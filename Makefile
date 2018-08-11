@@ -1,3 +1,5 @@
+# TODO: Change this Makefile so that it is a decent one
+
 #---------------------------------------------------
 # Target file to be compiled by default
 #---------------------------------------------------
@@ -134,4 +136,3 @@ super:
 	sudo chown root $(DEST)
 	sudo chgrp root $(DEST)
 	sudo chmod a+s $(DEST)
-

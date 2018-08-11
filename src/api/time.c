@@ -2,7 +2,10 @@
 // Inspired by the functions shown by Professor Giorgio Buttazzo
 
 // TODO: the void functions are unsafe, pointers should always be checked and
-// a value should always be returned to the caller
+// a value should always be returned to the caller.
+// On the other hand, if the value provided is invalid we can always say that
+// the behavior is undefined, after all the correctness of the arguments is a
+// duty of the caller.
 
 #include <time.h>
 
@@ -28,9 +31,9 @@ void time_add_ms(struct timespec *t, int ms)
 
 // Compares the two values contained in t1 and t2.
 // Returns:
-//		1	if t1 > t2
-//	   -1	if t1 < t2
-//		0	otherwise
+//		 1	if t1 > t2
+//		-1	if t1 < t2
+//		 0	otherwise
 int time_cmp(struct timespec t1, struct timespec t2)
 {
 	if (t1.tv_sec > t2.tv_sec) return 1;

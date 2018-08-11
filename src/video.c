@@ -504,7 +504,7 @@ static struct timespec current_time;
 													// or mouse is not on screen
 
 	pos = mouse_pos;
-	pressed = BOOL(mouse_b & 1);
+	pressed = mouse_b & 1;
 
 	// TODO: move to macro
 	x = pos >> 16;

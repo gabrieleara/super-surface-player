@@ -18,7 +18,6 @@
         "*.tcc": "cpp",
         "system_error": "cpp",
         "limits": "cpp",
-        "std_emu.h": "c",
         "type_traits": "c"
     },
     "files.trimTrailingWhitespace": true,

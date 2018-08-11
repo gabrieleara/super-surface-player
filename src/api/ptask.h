@@ -1,8 +1,21 @@
-#ifndef __PTASKS_H__
-#define __PTASKS_H__
+#ifndef PTASKS_H
+#define PTASKS_H
 
 // Periodic tasks utility functions
 // Inspired by the functions shown by Professor Giorgio Buttazzo
+
+// Following macro is needed because Intellisense fails to find the following macros:
+// PTHREAD_PRIO_NONE,
+// PTHREAD_PRIO_INHERIT,
+// PTHREAD_PRIO_PROTECT
+// and other macros defined if __USE_POSIX199506 macro is defined.
+
+// However, this won't affect the system during compilation with gcc thanks to
+// __INTELLISENSE__ macro.
+
+#if defined __INTELLISENSE__ && !defined __USE_POSIX199506
+#define __USE_POSIX199506
+#endif
 
 #include <pthread.h>
 #include <sched.h>
@@ -15,14 +28,13 @@
 
 #define PTASK_MAX	(50)
 
-typedef enum __PTASK_ENUM
-{
-	PS_ERROR = -1,
-	PS_FREE = 0,
-	PS_NEW,
-	//PS_ACTIVE,
-	PS_JOINABLE
-} ptask_state_t;
+	typedef enum __PTASK_ENUM {
+		PS_ERROR = -1,
+		PS_FREE = 0,
+		PS_NEW,
+		//PS_ACTIVE,
+		PS_JOINABLE
+	} ptask_state_t;
 
 typedef struct __PTASK_STRUCT
 {
@@ -332,7 +344,6 @@ void* task_body(void* arg) {
 
 	ptask_start_period(tp);
 
-	// alternative -> BOOL(<condition>)
 	while (// <contition> ==
 		true)
 	{
