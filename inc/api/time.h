@@ -37,10 +37,6 @@ extern void time_add_ms(struct timespec *t, int ms);
 //		 0	otherwise
 extern int time_cmp(struct timespec t1, struct timespec t2);
 
-// TODO: why the hell there are two declarations here?
-// Returns >0 if t1 > t2, <0 if t1 < t2 or 0 if equal
-extern int time_cmp(struct timespec t1, struct timespec t2);
-
 // The value in tdest will be replaced with the difference between the two
 // timespec (t2 - t1); to work properly, t2 must be greater or equal than t1
 

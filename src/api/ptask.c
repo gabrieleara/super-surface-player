@@ -3,11 +3,10 @@
 
 #include <limits.h>
 #include <errno.h>
+#include <stdbool.h>
 
-#include "std_emu.h"
-#include "time.h"
-
-#include "ptask.h"
+#include "api/time.h"
+#include "api/ptask.h"
 
 //-------------------------------------------------------------
 // GLOBAL PRIVATE VARIABLES

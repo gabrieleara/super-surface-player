@@ -18,7 +18,10 @@
         "*.tcc": "cpp",
         "system_error": "cpp",
         "limits": "cpp",
-        "type_traits": "c"
+        "type_traits": "c",
+        "time.h": "c",
+        "std_emu.h": "c",
+        "stdbool.h": "c"
     },
     "files.trimTrailingWhitespace": true,
     "C_Cpp.intelliSenseEngine": "Default",
