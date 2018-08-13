@@ -1,5 +1,3 @@
-# TODO: define NDEBUG if compilation command is not a debug one
-
 #---------------------------------------------------
 # Paths
 #---------------------------------------------------
@@ -7,10 +5,12 @@ vpath %.c src src/api
 vpath %.h inc inc/api
 vpath %.o obj
 
-DIR_OBJ = obj
 DIR_RES = res
+
+DIR_OBJ = obj
 DIR_DIS = dist
 DIR_DEP = dep
+DIRECTORIES = $(DIR_OBJ) $(DIR_DIS) $(DIR_DEP)
 
 #---------------------------------------------------
 # Files
@@ -24,7 +24,6 @@ APIS_SRC = time.c ptask.c
 MODULES_SRC = main.c audio.c video.c
 
 SOURCES = $(APIS_SRC) $(MODULES_SRC)
-
 OBJECTS = $(addprefix $(DIR_OBJ)/,$(SOURCES:.c=.o))
 
 #---------------------------------------------------
@@ -32,8 +31,8 @@ OBJECTS = $(addprefix $(DIR_OBJ)/,$(SOURCES:.c=.o))
 #---------------------------------------------------
 
 # Phony tagets are always executed
-# TODO: compile clean debug compile-debug super help
-.PHONY: main directories compile clean debug compile-debug super help
+# TODO: help
+.PHONY: main directories compile clean clean-dep debug compile-debug super help
 
 # Compiler
 CC = gcc
@@ -43,7 +42,6 @@ CFLAGS += -Wall -pedantic
 
 # Include paths
 INCLUDES = -iquote inc
-#-Iinc -I-
 
 # Linking options
 LDLIBS = -lpthread -lm -lrt
@@ -65,7 +63,7 @@ MKDIR = mkdir -p
 #---------------------------------------------------
 
 # Default make command
-main: compile super
+main: directories compile super
 
 # Default compilation command
 # FIXME: in this case resources are always copied from res to distribution folder
@@ -77,11 +75,14 @@ compile: $(DEST)
 clean:
 	rm -rf $(DIR_OBJ)/*.o $(DIR_DIS)/*
 
+clean-dep:
+	rm -f $(DIR_DEP)/*.d
+
 # Create directories that are not synchronized using git
-directories: $(DIR_OBJ) $(DIR_DIS)
+directories: $(DIRECTORIES)
 
 # Compile in debug mode
-debug: compile-debug
+debug: directories compile-debug
 
 compile-debug: CFLAGS += -ggdb -O0
 compile-debug: LDFLAGS += -ggdb
@@ -104,7 +105,7 @@ $(DEST): $(OBJECTS) $(LOADLIBES) $(LDLIBS)
 	$(LINK.o) $^ -o $@ $(LDALLEGRO)
 
 # All directories are created using this rule
-$(DIR_OBJ) $(DIR_DIS):
+$(DIRECTORIES):
 	$(MKDIR) $@
 
 #---------------------------------------------------
@@ -120,7 +121,7 @@ $(DIR_OBJ)/%.o: %.c
 # Place a hyphen before include to suppress warning
 DEPENDENCIES = $(addprefix $(DIR_DEP)/,$(SOURCES))
 
-include $(subst .c,.d,$(DEPENDENCIES))
+-include $(subst .c,.d,$(DEPENDENCIES))
 
 $(DIR_DEP)/%.d: %.c
 	$(CC) -M $(CPPFLAGS) $(INCLUDES) $< > $@.$$$$; \
