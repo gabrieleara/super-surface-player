@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -45,6 +46,7 @@ typedef struct __MAIN_STRUCT
 	ptask_cond_t	cond;			// used to wake up main thread
 } main_state_t;
 
+// TODO: static?
 main_state_t main_state =
 {
 	.tasks_terminate = false,
@@ -222,7 +224,7 @@ void cmd_help()
  */
 void cmd_open(char* filename)
 {
-char	buffer[MAX_BUFFER_SIZE];
+char	buffer[MAX_CHAR_BUFFER_SIZE];
 int		err = 0;
 
 	if(filename[0] != '/')
@@ -281,9 +283,9 @@ int err;
 
 void terminal_mode()
 {
-char buffer[MAX_BUFFER_SIZE];		// Buffer containing the inserted line
-char command[MAX_BUFFER_SIZE];		// Parsed command
-char argument[MAX_BUFFER_SIZE];		// Parsed optional argument
+char buffer[MAX_CHAR_BUFFER_SIZE];	// Buffer containing the inserted line
+char command[MAX_CHAR_BUFFER_SIZE];	// Parsed command
+char argument[MAX_CHAR_BUFFER_SIZE];// Parsed optional argument
 bool start_graphic_mode = false;	// Used to exit this mode
 int num_strings;
 int fnum;							// File number optionally specified by the
@@ -379,13 +381,11 @@ int start_ui_task()
 			TASK_UI_DEADLINE,
 			GET_PRIO(TASK_UI_PRIORITY),
 			user_interaction_task); // FIXME: define this task
-	return 0;
 }
 
 int start_microphone_task()
 {
-	/*
-	// TODO:
+	// TODO: change period
 	return
 		ptask_short(
 			&main_state.tasks[TASK_MIC],
@@ -394,7 +394,6 @@ int start_microphone_task()
 			TASK_MIC_DEADLINE,
 			GET_PRIO(TASK_MIC_PRIORITY),
 			microphone_task); // FIXME: define this task
-	*/
 	return 0;
 }
 
@@ -479,7 +478,9 @@ void _join_tasks()
 	// for (i = 0; i < TASK_NUM; ++i)
 	// 	ptask_join(&main_state.tasks[i]);
 
+	ptask_join(&main_state.tasks[TASK_UI]);
 	ptask_join(&main_state.tasks[TASK_GUI]);
+	ptask_join(&main_state.tasks[TASK_MIC]);
 }
 
 
@@ -503,7 +504,8 @@ void main_terminate_tasks()
 }
 
 /*
- * Forever loop for the main thread, until the program termination is requested.
+ * Forever loop for the main thread, until the graphic mode termination is
+ * requested.
  */
 void main_wait()
 {
@@ -515,10 +517,13 @@ void main_wait()
 	ptask_mutex_unlock(&main_state.mutex);
 
 	// Wait for termination of all the tasks
-
 	_join_tasks();
 }
 
+/*
+ * Returns wether tasks should terminate(gracefully) or keep going with their
+ * computations.
+ */
 bool main_get_tasks_terminate()
 {
 bool ret;
@@ -566,8 +571,10 @@ int err;
 	if (err) return err;
 
 	// Initializing semaphores
-	ptask_mutex_init(&main_state.mutex); // TODO: err
-	ptask_cond_init(&main_state.cond);
+	err = ptask_mutex_init(&main_state.mutex);
+	if (err) return err;
+	err = ptask_cond_init(&main_state.cond);
+	if (err) return err;
 
 	return 0;
 }

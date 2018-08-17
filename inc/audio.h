@@ -99,5 +99,6 @@ extern void audio_frequency_down(int i);
  * -----------------------------------------------------------------------------
  */
 
+extern void* microphone_task(void *arg);
 
 #endif

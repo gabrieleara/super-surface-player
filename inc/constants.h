@@ -5,9 +5,22 @@
 // GLOBAL SHARED CONSTANTS
 //-------------------------------------------------------------
 
-#define MAX_BUFFER_SIZE			256		// Size of any buffer used in the system
+#define MAX_CHAR_BUFFER_SIZE	256		// Size of any char buffer used in the
+										// system
 #define MAX_DIRECTORY_LENGTH	256		// Maximum length of a directory name
 
+//-------------------------------------------------------------
+// RECORDING CONSTANTS
+//-------------------------------------------------------------
+#define AUDIO_DESIRED_RATE		44100	// Desired acquisition rate (Hz)
+#define AUDIO_DESIRED_FRAMES	4096	// Desired acquisition buffer dimension
+#define AUDIO_NUM_BUFFERS		10		// Number of buffers related to audio
+										// acquisition
+
+// NOTICE: that the bigger this is, the bigger the latency of the system
+#define AUDIO_DESIRED_PERIOD	((1000*AUDIO_DESIRED_FRAMES)/AUDIO_DESIRED_RATE)
+
+// TODO: add dimensions of buffers used for data analysis
 
 //-------------------------------------------------------------
 // GRAPHIC CONSTANTS
@@ -222,9 +235,10 @@
 // MICROPHONE TASK
 
 #define TASK_MIC_WCET		(WCET_UNKNOWN)
-#define TASK_MIC_PERIOD		(8)		// Must be at least 100 times per second
-#define TASK_MIC_DEADLINE	(8)		// TODO: same as period?
-#define TASK_MIC_PRIORITY	(2)		// TODO: change
+#define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD)
+#define TASK_MIC_DEADLINE 	(TASK_MIC_PERIOD)
+									// TODO: same as period?
+#define TASK_MIC_PRIORITY	(3)		// TODO: change
 
 // TODO: FFT TASK
 // TODO: ANALYSIS TASK

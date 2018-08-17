@@ -21,7 +21,10 @@
         "type_traits": "c",
         "time.h": "c",
         "std_emu.h": "c",
-        "stdbool.h": "c"
+        "stdbool.h": "c",
+        "ptask.h": "c",
+        "cstdlib": "c",
+        "libgen.h": "c"
     },
     "files.trimTrailingWhitespace": true,
     "C_Cpp.intelliSenseEngine": "Default",

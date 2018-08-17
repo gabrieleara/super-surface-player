@@ -10,7 +10,8 @@ DIR_RES = res
 DIR_OBJ = obj
 DIR_DIS = dist
 DIR_DEP = dep
-DIRECTORIES = $(DIR_OBJ) $(DIR_DIS) $(DIR_DEP)
+DIR_TEST= test_files
+DIRECTORIES = $(DIR_OBJ) $(DIR_DIS) $(DIR_DEP) $(DIR_TEST)
 
 #---------------------------------------------------
 # Files
@@ -38,13 +39,13 @@ OBJECTS = $(addprefix $(DIR_OBJ)/,$(SOURCES:.c=.o))
 CC = gcc
 
 # Compilation options
-CFLAGS += -Wall -pedantic
+CFLAGS += -Wall -Wextra -pedantic
 
 # Include paths
 INCLUDES = -iquote inc
 
 # Linking options
-LDLIBS = -lpthread -lm -lrt
+LDLIBS = -lpthread -lm -lrt -lasound
 LDALLEGRO = `allegro-config --libs`
 
 # Adds includes declaration in COMPILE.c rule, so that CFLAGS/CPPFLAGS are

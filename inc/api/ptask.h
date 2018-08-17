@@ -24,17 +24,15 @@
 // DEFINES AND DATA TYPES
 //-------------------------------------------------------------
 
-// TODO: free and allocated task ids
-
 #define PTASK_MAX	(50)
 
-	typedef enum __PTASK_ENUM {
-		PS_ERROR = -1,
-		PS_FREE = 0,
-		PS_NEW,
-		//PS_ACTIVE,
-		PS_JOINABLE
-	} ptask_state_t;
+typedef enum __PTASK_ENUM {
+	PS_ERROR = -1,
+	PS_FREE = 0,
+	PS_NEW,
+	//PS_ACTIVE,
+	PS_JOINABLE
+} ptask_state_t;
 
 typedef struct __PTASK_STRUCT
 {
@@ -42,7 +40,7 @@ typedef struct __PTASK_STRUCT
 	long wcet;			// worst case execution time (in us): 0 means unknown
 	int period;			// in milliseconds
 	int deadline;		// relative to activation time (in ms)
-	int priority;		// value between [0,99], standard should be in [0, 32]
+	int priority;		// value between [0,99], standard should be in [0,32]
 	int dmiss;			// no. of occurred deadline misses
 	struct timespec at;	// next activ. time
 	struct timespec dl;	// next abs. deadline
@@ -61,6 +59,8 @@ typedef pthread_cond_t ptask_cond_t;
 #define PTASK_CAB_MAX		(50)	// maximum number of cabs per process
 #define PTASK_CAB_MAX_SIZE	(10)	// maximum number of buffers inside a cab
 
+// TODO: make some attributes "private"
+
 typedef struct __PTASK_CAB
 {
 	int	id;							// identificator of the cab
@@ -70,7 +70,7 @@ typedef struct __PTASK_CAB
 	void *buffers[PTASK_CAB_MAX_SIZE];
 									// pointers to the actual buffers
 
-	int busy[PTASK_CAB_MAX];		// number of tasks using each buffer
+	int busy[PTASK_CAB_MAX_SIZE];	// number of tasks using each buffer
 	int last_index;					// pointer to the current last data buffer
 
 	ptask_mutex_t _mux;				// mutex semaphore used to access the cab
@@ -111,8 +111,10 @@ extern int ptask_set_scheduler(int scheduler);
 
 	Returns zero otherwise.
 
-	NOTICE: on success this function overwrites any value it is inside the given
-	ptask_t element.
+	NOTE: on success this function overwrites any value it is inside the given
+	ptask_t element. Do not use an already-initialized ptask object with this
+	function unless it has been previously destroyed/joined. The ptask_short
+	function already destroys tasks that failed initialization.
 */
 extern int ptask_init(ptask_t *ptask);
 
@@ -154,7 +156,8 @@ extern int ptask_short(ptask_t *ptask,
 	blocking. To be sure that a ptask is actually terminated call ptask_join.
 
 	NOTE: this function may lead global values to inconsistency and should not
-	be used unless the program has to be forcefully terminated.
+	be used unless the program has to be forcefully terminated. Please a custom
+	termination condition inside your tasks to terminate them gracefully.
 */
 extern int ptask_cancel(ptask_t *ptask);
 
@@ -173,22 +176,23 @@ extern int ptask_join(ptask_t *ptask);
 extern void ptask_start_period(ptask_t *ptask);
 
 /*!
-	Suspends the calling thread until the next activation and, when awaken,
+	Suspends the calling task until the next activation and, when awaken,
 	updates activation time and deadline.
 
-	NOTE: Even though the thread calls time_add_ms() after the wake‐up time, the
+	NOTE: Even though the task calls time_add_ms() after the wake‐up time, the
 	computation is correct.
+	TODO: remove this note?
 */
 extern void ptask_wait_for_period(ptask_t *ptask);
 
 /*!
-	If the thread is still in execution after its deadline, it increments the
+	If the task is still in execution after its deadline, it increments the
 	value of dmiss and returns a non zero value, otherwise returns zero.
 */
 extern int ptask_deadline_miss(ptask_t *ptask);
 
 /*!
-	Getters for the ptask attributes
+	Getters for ptask attributes
 */
 extern int ptask_get_id(ptask_t *ptask);
 extern long ptask_get_wcet(ptask_t *ptask);
@@ -202,7 +206,7 @@ extern int ptask_get_dmiss(ptask_t *ptask);
 // MUTEXES AND CONDITION VARIABLES
 //-------------------------------------------------------------
 
-// The following functions are wrappers for the corresponding functions of the
+// The following functions are wrappers for the corresponding functions of
 // pthread library, see them for documentation
 extern int ptask_mutex_init(ptask_mutex_t *mux_p);
 extern int ptask_mutex_lock(ptask_mutex_t *mux_p);
@@ -222,8 +226,10 @@ extern int ptask_cond_broadcast(ptask_cond_t *cond_p);
 
 	Returns zero on success, a non zero value otherwise. In particular, if a new
 	cab cannot be initialized in this moment the
+	TODO: what did I meant here?
 */
-extern int ptask_cab_init(ptask_cab_t *ptask_cab, int n, int size, void *buffers[]);
+extern int ptask_cab_init(ptask_cab_t *ptask_cab, int n, int size,
+	void *buffers[]);
 
 /*!
 	Resets the cab last value to no value, as it was just been initialized.
@@ -252,7 +258,8 @@ extern int ptask_cab_reset(ptask_cab_t *ptask_cab);
 	NOTE: Attempting to reserve a buffer using a non already initialized cab
 	results in undefined behavior.
 */
-extern int ptask_cab_reserve(ptask_cab_t *ptask_cab, void* buffer[], ptask_cab_id_t *b_id);
+extern int ptask_cab_reserve(ptask_cab_t *ptask_cab, void* buffer[],
+	ptask_cab_id_t *b_id);
 
 /*!
 	This function commits the value written in a cab buffer as the new last

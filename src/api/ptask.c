@@ -396,7 +396,7 @@ struct timespec now;
 }
 
 /*!
-	Getters for the ptask attributes
+	Getters for ptask attributes
 */
 int ptask_get_id(ptask_t *ptask)
 {
@@ -450,7 +450,9 @@ static void _ptask_init_mutex_attr()
 }
 
 // The following functions are wrappers for the corresponding functions of the
-// pthread library, see them for documentation
+// pthread library, see them for documentation. Arguments used in pthread
+//library that are not shown in these functions interface are handled by this
+// library itself.
 
 int ptask_mutex_init(ptask_mutex_t *mux_p)
 {
@@ -512,7 +514,7 @@ static int _next_cab_id = 1;		// Used to assign the id to the next new
 
 static inline int _ptask_cab_canallocate()
 {
-	return _next_cab_id < PTASK_CAB_MAX;
+	return _next_cab_id <= PTASK_CAB_MAX;
 }
 
 static inline int _ptask_cab_next_id()
@@ -533,6 +535,9 @@ int i;
 	if(n > PTASK_CAB_MAX_SIZE)
 		return EINVAL;
 
+	// TODO: notice that this error returns EAGAIN, but since CABs are never
+	// destroyed it will acctually never be available again in the future, so
+	// EAGAIN is probably not the best error here
 	if (!_ptask_cab_canallocate())
 		return EAGAIN;
 
@@ -612,7 +617,7 @@ int i=0;
 	message put in the cab. It MUST be called after a ptask_cab_reserve call
 	using the b_id value obtained by it and ONLY ONCE.
 
-	On success, the given buffer is set as the contenitor of the last message in
+	On success, the given buffer is set as the container of the last message in
 	the cab.
 
 	It returns zero on success, a non zero value otherwise.

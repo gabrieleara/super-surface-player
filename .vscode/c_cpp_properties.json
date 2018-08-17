@@ -32,7 +32,8 @@
                 "/usr/include",
                 "/usr/include/x86_64-linux-gnu",
                 "/usr/lib/gcc/x86_64-linux-gnu/5/include/",
-                "${workspaceRoot}"
+                "${workspaceRoot}",
+                "${workspaceFolder}/inc"
             ],
             "defines": [],
             "intelliSenseMode": "clang-x64",

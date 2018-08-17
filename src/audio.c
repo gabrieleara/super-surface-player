@@ -1,10 +1,12 @@
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <libgen.h>			// Used for basename
 
 #include <assert.h>			// Used in debug
 
 #include <allegro.h>
+#include <alsa/asoundlib.h>
 
 #include "api/std_emu.h"	// Boolean type declaration
 #include "api/ptask.h"
@@ -12,6 +14,7 @@
 #include "constants.h"
 
 #include "audio.h"
+#include "main.h"
 
 /* -----------------------------------------------------------------------------
  * CONSTANTS
@@ -76,19 +79,27 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 	// TODO: pointer of the SAMPLE of recognized sound
 } audio_file_desc_t;
 
+// TODO: change this struct to comply with ALSA code requirements, not Allegro,
+// since Allegro doesn't work
+/*
 typedef struct __AUDIO_RECORD_INFO_STRUCT
 {
-	int cap_bits;		// Tells which kind of bit encoding the system supports
-	int cap_stereo;		// Tells if the system is capable of recording stereo
-						// input
-	int max_frequency;	// Tells the maximum possible sample frequency
+	// TODO: remove this struct
 } audio_record_info_t;
+*/
 
 typedef struct __AUDIO_RECORD_STRUCT
 {
-	audio_record_info_t info;
-							// Contains all the info about the recording module
-							// support
+	unsigned int rrate;		// Recording acquisition ratio, as accepted by the
+							// device
+	snd_pcm_uframes_t rframes;
+							// Period requested to recorder task, expressed in
+							// terms of number of frames
+	snd_pcm_t *alsa_handle; // ALSA Hardware Handle used to record audio
+
+	short buffers[AUDIO_NUM_BUFFERS][AUDIO_DESIRED_FRAMES];
+							// Buffers used within the cab
+	ptask_cab_t cab;		// CAB used to handle allocated buffers
 } audio_record_t;
 
 // Global state of the module
@@ -140,15 +151,15 @@ audio_state_t audio_state =
  */
 void _path_to_basename(char* dest, const char* path)
 {
-char	buffer[MAX_BUFFER_SIZE];// Buffer, used to prevent path modifications
+char	buffer[MAX_CHAR_BUFFER_SIZE];// Buffer, used to prevent path modifications
 char	*base_name;
 int		len;
 
-	strncpy(buffer, path, MAX_BUFFER_SIZE);
+	strncpy(buffer, path, MAX_CHAR_BUFFER_SIZE);
 
 	base_name = basename(buffer);
 
-	len = strnlen(buffer, MAX_BUFFER_SIZE);
+	len = strnlen(buffer, MAX_CHAR_BUFFER_SIZE);
 
 	if (len >= MAX_AUDIO_NAME_LENGTH)
 	{
@@ -175,70 +186,102 @@ int		len;
 #define AUDIO_INPUT_STEREO	1
 
 /*
- * Initializes the mutex TODO: and the other required data structures.
+ * Initializes the mutex and the other required data structures.
+ * TODO: split this body to multuple functions
  */
 int audio_init()
 {
 int err;
-int cap_bits;		// Tells which kind of bit encoding the system supports
-int cap_stereo;		// Tells if the system is capable of recording stereo input
-int max_frequency;	// Tells the maximum possible sample frequency
+int index;
+void *cab_pointers[AUDIO_NUM_BUFFERS];
+								// Pointers to buffers used in cab library
+unsigned int rrate = AUDIO_DESIRED_RATE;
+								// Recording acquisition ratio, as accepted by
+								// the device
+snd_pcm_uframes_t rframes = AUDIO_DESIRED_FRAMES;
+								// Period requested to recorder task, expressed
+								// in terms of number of frames
+snd_pcm_t *alsa_handle;			// ALSA Hardware Handle used to record audio
+snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 
+	// Mutex initialization
 	err = ptask_mutex_init(&audio_state.mutex);
 	if (err) return err;
 
 	// Allegro sound initialization
-	err = install_sound(DIGI_AUTODETECT, MIDI_AUTODETECT, NULL); // TODO: MIDI
+	err = install_sound(DIGI_AUTODETECT, MIDI_NONE, NULL); // TODO: MIDI_AUTODETECT
 	if (err) return err;
 
-	// FIXME: SOUND INPUT DOES NOT WORK!
+	// From now on, ALSA PCM code follows
 
-	// TODO: GABRI GUARDA QUA: rimuovi l'inizio del commento alla prossima riga
-	// Per riabilitare l'input del microfono
-/*
-	err = install_sound_input(DIGI_AUTODETECT, MIDI_NONE);
+	// Open PCM device for recording (capture)
+	err = snd_pcm_open(&alsa_handle, "default",
+				SND_PCM_STREAM_CAPTURE, SND_PCM_NONBLOCK);
+	if (err < 0) return err;
+
+	// Allocate a hardware parameters object
+	err = snd_pcm_hw_params_malloc(&hw_params);
+	if (err < 0) return err;
+	// Fill it with default values
+	err = snd_pcm_hw_params_any(alsa_handle, hw_params);
+	if (err < 0) return err;
+
+	// From now on we set desired hardware parameters.
+
+	// Interleaved mode (we'll use only one channel though)
+	err = snd_pcm_hw_params_set_access(alsa_handle, hw_params,
+			SND_PCM_ACCESS_RW_INTERLEAVED);
+	if (err < 0) return err;
+
+	// Signed 16-bit little-endian format
+	err = snd_pcm_hw_params_set_format(alsa_handle, hw_params,
+									   SND_PCM_FORMAT_S16_LE);
+	if (err < 0) return err;
+
+	// Settinhg the sampling rate.
+	// After this call rrate contains the real rate at which the device will
+	// record
+	err = snd_pcm_hw_params_set_rate_near(alsa_handle, hw_params, &rrate, 0);
+	if (err < 0) return err;
+
+	// Setting one channel only (mono)
+	err = snd_pcm_hw_params_set_channels(alsa_handle, hw_params, 1);
+	if (err < 0) return err;
+
+	// Setting execution period size based on number of frames of the buffer
+	// After this call, rframes will contain the actual period accepted by the
+	// device
+	err = snd_pcm_hw_params_set_period_size_near(alsa_handle, hw_params,
+		&rframes, 0);
+	if (err < 0) return err;
+
+	// Writing parameters to the driver
+	err = snd_pcm_hw_params(alsa_handle, hw_params);
+	if (err < 0) return err;
+
+	// Freeing up local resources allocated via malloc
+	snd_pcm_hw_params_free(hw_params);
+
+	// TODO: this can be made a local buffer
+	for (index = 0; index < AUDIO_NUM_BUFFERS; ++index)
+	{
+		cab_pointers[index] = STATIC_CAST(void*, audio_state.record.buffers[index]);
+	}
+
+	// Initializing the capture CAB buffers
+	err = ptask_cab_init(&audio_state.record.cab,
+		AUDIO_NUM_BUFFERS,
+		AUDIO_DESIRED_FRAMES,
+		cab_pointers);
+
 	if (err) return err;
-/*
-	cap_bits = get_sound_input_cap_bits();
-	if (cap_bits == 0)
-	{
-		// No audio input is supported, should not be possibile, since
-		// install_sound_input returned a zero value.
-		assert(false);
-		return EINVAL;
 
-	}
-	else if (cap_bits & 16)
-	{
-		// We can have sixteen bit audio input. Good.
-		// TODO:
+	// Copy local vales to global structure
+	audio_state.record.rrate = rrate;
+	audio_state.record.rframes = rframes;
+	audio_state.record.alsa_handle = alsa_handle;
 
-		max_frequency = get_sound_input_cap_rate(16, AUDIO_INPUT_MONO);
-	}
-	else if (cap_bits & 8)
-	{
-		max_frequency = get_sound_input_cap_rate(8, AUDIO_INPUT_MONO);
-
-		// We can have only eight bit audio input. Not so good.
-		return EINVAL; // TODO: currently not supported
-	}
-
-	cap_stereo = get_sound_input_cap_stereo();
-
-	audio_state.record.info.cap_bits = cap_bits;
-	audio_state.record.info.cap_stereo = cap_stereo;
-	audio_state.record.info.max_frequency = max_frequency;
-
-	printf("\r\nAudio module settings:\r\n");
-	printf("- cap_bits = %d\r\n", cap_bits);
-	printf("- cap_stereo = %d\r\n", cap_stereo);
-	printf("- max_frequency = %d\r\n\r\n", max_frequency);
-
-	// TODO: put the following in another function, activated by a command in text mode:
-	// get_sound_input_cap_parm(int rate, int bits, int stereo);
-
-	*/
-	return err;
+	return 0;
 }
 
 /*
@@ -638,4 +681,119 @@ void audio_frequency_down(int i)
 		audio_state.audio_files[i].frequency = MIN_FREQ;
 
 	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+/* -----------------------------------------------------------------------------
+ * TASKS
+ * -----------------------------------------------------------------------------
+ */
+
+// TODO: reduce this body
+void* microphone_task(void *arg)
+{
+ptask_t*	tp;			// task pointer
+int			task_id;	// task identifier
+
+// Local variables
+int		err;
+
+// TODO: do not use local buffer, request a CAB first
+int 	buffer_index;	// index of local buffer used to get microphone data
+						// used to access cab
+short	*buffer;		// pointer to local buffer, changes each execution
+
+int		how_many_read;	// how many frames have been read from the stream
+int		missing;		// how many are missing before the next acquisition
+
+	tp = STATIC_CAST(ptask_t *, arg);
+	task_id = ptask_get_id(tp);
+
+	// Variables initialization and initial computation
+
+	// Preparing the microphone interface to be used
+	err = snd_pcm_prepare(audio_state.record.alsa_handle);
+	if (err)
+		abort_on_error("Could not prepare microphone acquisition.");
+
+	ptask_start_period(tp);
+
+	while (!main_get_tasks_terminate())
+	{
+		how_many_read	= 0;
+		missing			= audio_state.record.rframes;
+
+		// Get a local buffer from the CAB TODO: check wether this is fine
+		// It never fails if the number of tasks is strictly less than the
+		// number of available CABs, otherwise the behavior is unspecified
+		ptask_cab_reserve(&audio_state.record.cab,
+			STATIC_CAST(void*, &buffer),
+			&buffer_index);
+
+		// TODO: Move capture to another function
+
+		// Capture audio from stream and write it to assigned CAB
+		while (missing > 0)
+		{
+			err = snd_pcm_readi(audio_state.record.alsa_handle,
+				STATIC_CAST(void *, buffer + how_many_read),
+				missing);
+
+			// TODO: once we have timed waits, decide how to handle better
+			// undersampling
+
+			if (err < 0)
+			{
+				switch (err)
+				{
+				case -EBADFD:
+					fprintf(stderr,
+							"ALSA device was not in correct state: %s.\r\n",
+							snd_strerror(err));
+					assert(false);
+					break;
+				case -EPIPE:
+					// TODO: Overrun
+					fprintf(stderr, "WARN: ALSA overrun: %s.\r\n", snd_strerror(err));
+					break;
+				case -ESTRPIPE:
+					// TODO: Suspend event occurred
+					fprintf(stderr,
+							"WARN: ALSA suspend event occurred: %s.\r\n",
+							snd_strerror(err));
+					break;
+				case -EAGAIN:
+					fprintf(stderr, "WARN: ALSA EAGAIN.\r\n");
+					break;
+				default:
+					fprintf(stderr,
+							"WARN: ALSA unexpected error: %s.\r\n",
+							snd_strerror(err));
+					assert(false);
+					break;
+				}
+			}
+			else
+			{
+				fprintf(stderr, "LOG: read %d values.\r\n", err);
+				how_many_read	+= err;
+				missing			-= err;
+			}
+		}
+
+		// Release CAB to apply changes
+		ptask_cab_putmes(&audio_state.record.cab, buffer_index);
+
+		// TODO: how do I know from within another thread wether this is new
+		// data or data already read from that very thread?
+
+		if (ptask_deadline_miss(tp))
+			printf("TASK_MIC missed %d deadlines!\r\n", ptask_get_dmiss(tp));
+
+		ptask_wait_for_period(tp);
+	}
+
+	// Cleanup
+	ptask_cab_reset(&audio_state.record.cab);
+
+	return NULL;
 }
