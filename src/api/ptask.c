@@ -545,6 +545,7 @@ int i;
 	ptask_cab->num_buffers = n;
 	ptask_cab->size_buffers = size;
 	ptask_cab->last_index = -1;
+	// timestamp remains uninitialized
 
 	for(i = 0; i < n; ++i)
 		ptask_cab->buffers[i] = buffers[i];
@@ -591,7 +592,7 @@ int ptask_cab_reset(ptask_cab_t *ptask_cab)
 */
 int ptask_cab_reserve(ptask_cab_t *ptask_cab, void* buffer[], ptask_cab_id_t *b_id)
 {
-int i=0;
+int i = 0;
 
 	ptask_mutex_lock(&ptask_cab->_mux);
 
@@ -638,6 +639,7 @@ int err = 0;
 	{
 		ptask_cab->busy[b_id] = 0;
 		ptask_cab->last_index = b_id;
+		clock_gettime(CLOCK_MONOTONIC, &ptask_cab->timestamp);
 	}
 
 	ptask_mutex_unlock(&ptask_cab->_mux);
@@ -652,6 +654,9 @@ int err = 0;
 	buffer. This id will be used later to release the obtained buffer using
 	ptask_cab_unget.
 
+	Last argument is an OUT argument that contains the timestamp at which said
+	buffer has been produced. Accepts also NULL if non interested.
+
 	It returns zero on success, a non zero value otherwise. In particular,
 	EAGAIN is returned if no value has been put inside the cab or the cab has
 	been resetted using ptask_cab_reset.
@@ -659,7 +664,8 @@ int err = 0;
 	NOTE: Attempting to reserve a buffer using a non already initialized cab
 	results in undefined behavior.
 */
-int ptask_cab_getmes(ptask_cab_t *ptask_cab, void* buffer[], ptask_cab_id_t *b_id)
+int ptask_cab_getmes(ptask_cab_t *ptask_cab, void* buffer[],
+	ptask_cab_id_t *b_id, struct timespec *timestamp)
 {
 int err = 0;
 
@@ -669,7 +675,9 @@ int err = 0;
 		err = EAGAIN;
 	else
 	{
-		*b_id = ptask_cab->last_index;
+		*b_id		= ptask_cab->last_index;
+		if (timestamp != NULL)
+			*timestamp	= ptask_cab->timestamp;
 		++ptask_cab->busy[*b_id];
 	}
 
@@ -688,8 +696,10 @@ int err = 0;
 
 	It returns zero on success, a non zero value otherwise.
 
-	NOTE: Attempting to release a buffer within a non already initialized cab
+	NOTICE: Attempting to release a buffer within a non already initialized cab
 	results in undefined behavior.
+
+	NOTICE: This can be used also to cancel a reservation request.
 */
 int ptask_cab_unget(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id)
 {

@@ -17,9 +17,14 @@
 #define AUDIO_NUM_BUFFERS		10		// Number of buffers related to audio
 										// acquisition
 
+// Converts a certain number of frames in milliseconds, given current
+// capture rate
+#define FRAMES_TO_MS(frames,rate) \
+	((1000L * STATIC_CAST(long,frames)) / STATIC_CAST(long,rate))
+
 // NOTICE: that the bigger this is, the bigger the latency of the system
-//#define AUDIO_DESIRED_PERIOD	((1000*AUDIO_DESIRED_FRAMES)/AUDIO_DESIRED_RATE)
-#define AUDIO_DESIRED_PERIOD	93		// in ms
+#define AUDIO_DESIRED_PERIOD \
+	FRAMES_TO_MS(AUDIO_DESIRED_FRAMES,AUDIO_DESIRED_RATE)
 
 // TODO: Add dimensions of buffers used for data analysis
 
@@ -240,7 +245,7 @@
 // MICROPHONE TASK
 
 #define TASK_MIC_WCET		(WCET_UNKNOWN)
-#define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD)
+#define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD/10)
 #define TASK_MIC_DEADLINE 	(TASK_MIC_PERIOD)
 #define TASK_MIC_PRIORITY	(3)
 

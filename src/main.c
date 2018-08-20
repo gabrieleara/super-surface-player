@@ -384,7 +384,6 @@ int start_gui_task()
 
 int start_ui_task()
 {
-#ifdef NDEBUG
 	return
 		ptask_short(
 			&main_state.tasks[TASK_UI],
@@ -392,11 +391,7 @@ int start_ui_task()
 			TASK_UI_PERIOD,
 			TASK_UI_DEADLINE,
 			GET_PRIO(TASK_UI_PRIORITY),
-			user_interaction_task); // FIXME: This task seemed to fail in debug
-									// mode, check it again
-#else
-	return 0;
-#endif
+			user_interaction_task);
 }
 
 int start_microphone_task()

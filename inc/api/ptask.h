@@ -70,6 +70,8 @@ typedef struct __PTASK_CAB
 
 	int busy[PTASK_CAB_MAX_SIZE];	// number of tasks using each buffer
 	int last_index;					// pointer to the current last data buffer
+	struct timespec timestamp;		// time at which the most recent buffer has
+									// been inserted
 
 	ptask_mutex_t _mux;				// mutex semaphore used to access the cab
 } ptask_cab_t;
@@ -286,6 +288,9 @@ extern int ptask_cab_putmes(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id);
 	buffer. This id will be used later to release the obtained buffer using
 	ptask_cab_unget.
 
+	Last argument is an OUT argument that contains the timestamp at which said
+	buffer has been produced. Accepts also NULL if non interested.
+
 	It returns zero on success, a non zero value otherwise. In particular,
 	EAGAIN is returned if no value has been put inside the cab or the cab has
 	been resetted using ptask_cab_reset.
@@ -294,19 +299,21 @@ extern int ptask_cab_putmes(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id);
 	results in undefined behavior.
 */
 extern int ptask_cab_getmes(ptask_cab_t *ptask_cab, void* buffer[],
-	ptask_cab_id_t *b_id);
+	ptask_cab_id_t *b_id, struct timespec *timestamp);
 
-/*!
+	/*!
 	This function releases a buffer acquired for reading purposes using the
 	ptask_cab_getmes. It MUST be called after a ptask_cab_getmes call
 	using the b_id value obtained by it and ONLY ONCE.
 
 	It returns zero on success, a non zero value otherwise.
 
-	NOTE: Attempting to release a buffer within a non already initialized cab
+	NOTICE: Attempting to release a buffer within a non already initialized cab
 	results in undefined behavior.
+
+	NOTICE: This can be used also to cancel a reservation request.
 */
-extern int ptask_cab_unget(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id);
+	extern int ptask_cab_unget(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id);
 
 /*
 
