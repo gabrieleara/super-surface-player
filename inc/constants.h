@@ -18,9 +18,10 @@
 										// acquisition
 
 // NOTICE: that the bigger this is, the bigger the latency of the system
-#define AUDIO_DESIRED_PERIOD	((1000*AUDIO_DESIRED_FRAMES)/AUDIO_DESIRED_RATE)
+//#define AUDIO_DESIRED_PERIOD	((1000*AUDIO_DESIRED_FRAMES)/AUDIO_DESIRED_RATE)
+#define AUDIO_DESIRED_PERIOD	93		// in ms
 
-// TODO: add dimensions of buffers used for data analysis
+// TODO: Add dimensions of buffers used for data analysis
 
 //-------------------------------------------------------------
 // GRAPHIC CONSTANTS
@@ -32,7 +33,6 @@
 
 #define COLOR_MODE	(32)			// default color mode
 
-// TODO: change
 #define COLOR_WHITE		(0xFFFFFF)	// white
 #define COLOR_BKG		(0xF0F0F0)	// light gray background
 #define COLOR_PRIM_DARK	(0x388E3C)	// dark primary color
@@ -194,8 +194,8 @@
 #define TIME_P	(PADDING*2)				// time graph padding
 #define TIME_X	(0)						// time graph position x
 #define TIME_Y	(FFT_MY)				// time graph position y
-#define TIME_MX	(HOR_PANEL_MX)			// time graph max x
-#define TIME_MY	(HOR_PANEL_H + TIME_Y)	// time graph max y
+#define TIME_MX	(SIDE_X)				// time graph max x
+#define TIME_MY (FOOTER_Y)				// time graph max y
 
 //-------------------------------------------------------------
 // TASKS CONSTANTS
@@ -218,6 +218,11 @@
 	#define GET_PRIO(prio) (0)		// In debug mode real time scheduling is
 #endif								// disabled, so priority must be zero
 
+// TODO: Periods of tasks should be chosen in a more rigorous manneer, perform
+// a scheduling analysis once all tasks are correctly defined. Also, priority
+// between tasks should be defined in terms of the results of said
+// schedulability analysis.
+
 // GUI TASK
 #define TASK_GUI_WCET		(WCET_UNKNOWN)
 #define TASK_GUI_PERIOD		(30)	// a little more than 30 fps
@@ -228,18 +233,18 @@
 // USER INTERACTION TASK
 
 #define TASK_UI_WCET		(WCET_UNKNOWN)
-#define TASK_UI_PERIOD		(10)	// TODO: change
-#define TASK_UI_DEADLINE	(10)	// TODO: same as period?
-#define TASK_UI_PRIORITY	(2)		// TODO: change
+#define TASK_UI_PERIOD		(10)
+#define TASK_UI_DEADLINE	(10)
+#define TASK_UI_PRIORITY	(2)
 
 // MICROPHONE TASK
 
 #define TASK_MIC_WCET		(WCET_UNKNOWN)
 #define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD)
 #define TASK_MIC_DEADLINE 	(TASK_MIC_PERIOD)
-									// TODO: same as period?
-#define TASK_MIC_PRIORITY	(3)		// TODO: change
+#define TASK_MIC_PRIORITY	(3)
 
-// TODO: FFT TASK
-// TODO: ANALYSIS TASK
+// TODO: Define characteristics of each ANALYSIS TASK
+
+
 #endif

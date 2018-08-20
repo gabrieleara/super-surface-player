@@ -370,7 +370,7 @@ void ptask_wait_for_period(ptask_t *ptask)
 {
 	while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &(ptask->at), NULL) != 0)
 	{
-		// TODO: print that this thread has been interrupted?
+		// IDEA: Could it be a good idea to print that this thread has been interrupted?
 	}
 
 	time_add_ms(&(ptask->at), ptask->period);
@@ -445,7 +445,7 @@ static void _ptask_init_mutex_attr()
 {
 	pthread_mutexattr_init(&_matt);
 
-	// TODO: change to priority ceiling if needed
+	// NOTE: Change to priority ceiling if needed
 	pthread_mutexattr_setprotocol(&_matt, PTHREAD_PRIO_INHERIT);
 }
 
@@ -525,8 +525,9 @@ static inline int _ptask_cab_next_id()
 /*!
 	Initiaizes a new cab, with the given n buffers, each with the given size.
 
-	Returns zero on success, a non zero value otherwise. In particular, if a new
-	cab cannot be initialized in this moment the
+	Returns zero on success, a non zero value otherwise. Notice that if the
+	maximum number of CABs has already been assigned this function will return
+	EINVAL.
 */
 int ptask_cab_init(ptask_cab_t *ptask_cab, int n, int size, void *buffers[])
 {
@@ -535,11 +536,8 @@ int i;
 	if(n > PTASK_CAB_MAX_SIZE)
 		return EINVAL;
 
-	// TODO: notice that this error returns EAGAIN, but since CABs are never
-	// destroyed it will acctually never be available again in the future, so
-	// EAGAIN is probably not the best error here
 	if (!_ptask_cab_canallocate())
-		return EAGAIN;
+		return EINVAL;
 
 	*ptask_cab = _ptask_new_cab;
 
@@ -551,7 +549,6 @@ int i;
 	for(i = 0; i < n; ++i)
 		ptask_cab->buffers[i] = buffers[i];
 
-	// TODO: this may be unsafe? TODO: why?
 	ptask_mutex_init(&ptask_cab->_mux);
 
 	return 0;
@@ -708,33 +705,4 @@ int err = 0;
 	ptask_mutex_unlock(&ptask_cab->_mux);
 
 	return err;
-}
-
-/*!
-	UNSAFE
-
-	Destroys a given cab.
-
-	Shouldn't be used at all. To erase all the data within a cab in a safe way
-	see ptask_cab_reset. A cab is automatically released after program
-	termination, so this function isn't actually needed at all and should be
-	avoided.
-
-	Returns zero on sucess, a non zero value otherwise.
-
-	NOTE: It has so many unsafe behaviors that they won't be listed here, but
-	notice that inconsistency of data is a big deal.
-
-	AGAIN DO NOT USE. IT'S A VERY BAD IDEA. I SHOULDN'T EVEN HAVE WRITTEN THIS
-	AND IT WILL PROBABLY BE DELETED IN FUTURE REVISIONS.
-*/
-int ptask_cab_destroy(ptask_cab_t *ptask_cab)
-{
-	pthread_mutex_destroy(&ptask_cab->_mux);
-
-	// TODO: release cab id
-
-	*ptask_cab = _ptask_new_cab;
-
-	return 0;
 }

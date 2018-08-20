@@ -8,6 +8,8 @@
 #include <allegro.h>
 #include <alsa/asoundlib.h>
 
+#include <fftw3.h>
+
 #include "api/std_emu.h"	// Boolean type declaration
 #include "api/ptask.h"
 
@@ -58,6 +60,9 @@ typedef union __AUDIO_POINTER_UNION
 // Opened audio file descriptor
 typedef struct __AUDIO_FILE_DESC_STRUCT
 {
+	// NOTE: When modifying the audio_file_desc_t data structure, consider
+	// which state should be adopted as default state.
+
 	audio_pointer_t datap;	// Pointer to the opened file
 	audio_type_t	type;	// File type
 	int				volume;	// Volume used when playing this file
@@ -66,7 +71,8 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 							// Frequency used when playing this file,
 							// 1000 is the base frequency
 
-	// TODO:
+	// IDEA: I decided to not enable loop execution of audio files. If there is
+	// time left consider implementing it.
 	// bool loop;			// Tells if the audio should be reproduced in a loop
 
 	char filename[MAX_AUDIO_NAME_LENGTH];
@@ -76,18 +82,11 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 	bool			has_rec;// Tells if the file has an associated recorded
 							// audio that can be recognized to start it playing
 
-	// TODO: pointer of the SAMPLE of recognized sound
+	// TODO: How should I define an association between an audio file and the
+	// audio record that should be used to associate it with another file?
 } audio_file_desc_t;
 
-// TODO: change this struct to comply with ALSA code requirements, not Allegro,
-// since Allegro doesn't work
-/*
-typedef struct __AUDIO_RECORD_INFO_STRUCT
-{
-	// TODO: remove this struct
-} audio_record_info_t;
-*/
-
+// Status of the resources used to record audio
 typedef struct __AUDIO_RECORD_STRUCT
 {
 	unsigned int rrate;		// Recording acquisition ratio, as accepted by the
@@ -105,13 +104,18 @@ typedef struct __AUDIO_RECORD_STRUCT
 // Global state of the module
 typedef struct __AUDIO_STRUCT
 {
+	// NOTE: When modifying the audio_state_t data structure, consider
+	// which state should be adopted as default state.
 	audio_file_desc_t audio_files[MAX_AUDIO_FILES];
 							// Array of opened audio files for reproduction
 	int opened_audio_files;	// Number of currently opened audio files
 
 	audio_record_t record;	// Contains all the data needed to record
 
-	ptask_mutex_t mutex;	// TODO: mutex to access this data structure
+	ptask_mutex_t mutex;	// TODO: Right now accesses to this data structure
+							// are not protected (enough). A security check shall
+							// be performed to be sure that new code does not
+							// collide with old one.
 } audio_state_t;
 
 
@@ -124,10 +128,7 @@ const audio_file_desc_t audio_file_new =
 	.frequency	= SAME_FRQ,
 	.filename	= "",
 	.has_rec	= false,
-	/*
-	.loop		= false,
-	TODO:
-	*/
+	// .loop		= false,
 };
 
 /* -----------------------------------------------------------------------------
@@ -138,7 +139,6 @@ const audio_file_desc_t audio_file_new =
 audio_state_t audio_state =
 {
 	.opened_audio_files = 0,
-	// TODO:
 };
 
 /* -----------------------------------------------------------------------------
@@ -187,8 +187,9 @@ int		len;
 
 /*
  * Initializes the mutex and the other required data structures.
- * TODO: split this body to multuple functions
  */
+// TODO: Organize the body of this function into multiple functions with more
+// specialized purposes.
 int audio_init()
 {
 int err;
@@ -209,7 +210,9 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	if (err) return err;
 
 	// Allegro sound initialization
-	err = install_sound(DIGI_AUTODETECT, MIDI_NONE, NULL); // TODO: MIDI_AUTODETECT
+	// NOTE: MIDI files do not work, consider enabling MIDI_AUTODETECT and
+	// implement MIDI files support
+	err = install_sound(DIGI_AUTODETECT, MIDI_NONE, NULL);
 	if (err) return err;
 
 	// From now on, ALSA PCM code follows
@@ -262,7 +265,9 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	// Freeing up local resources allocated via malloc
 	snd_pcm_hw_params_free(hw_params);
 
-	// TODO: this can be made a local buffer
+	// TODO: Change this to be a local array of pointers, it will be copied
+	// inside the CAB data structure, so it is not needed to last more than
+	// this function's body.
 	for (index = 0; index < AUDIO_NUM_BUFFERS; ++index)
 	{
 		cab_pointers[index] = STATIC_CAST(void*, audio_state.record.buffers[index]);
@@ -349,7 +354,8 @@ int err = 0;
 			assert(false);
 		}
 
-		// TODO: if the file had a recorded trigger delete that too
+		// NOTE: Depending on how files are associated with recorded trigger
+		// samples, handle the removal of such triggers as well
 
 		--audio_state.opened_audio_files;
 
@@ -688,7 +694,75 @@ void audio_frequency_down(int i)
  * -----------------------------------------------------------------------------
  */
 
-// TODO: reduce this body
+void _read_mic_blocking(short* buffer, const int frames)
+{
+int err;
+int how_many_read = 0;
+int missing = frames;
+
+	while (missing > 0)
+	{
+		err = snd_pcm_readi(audio_state.record.alsa_handle,
+							STATIC_CAST(void *, buffer + how_many_read),
+							missing);
+
+		// TODO: Move from this code (executed at a period equal to the one
+		// needed to fill the buffer) to a code that gradually fills the buffer,
+		// but executes at a much higher rate.
+
+		if (err < 0)
+		{
+			switch (err)
+			{
+			case -EBADFD:
+				break;
+				fprintf(stderr,
+						"ALSA device was not in correct state: %s.\r\n",
+						snd_strerror(err));
+				assert(false);
+				break;
+			case -EPIPE:
+				break;
+				// NOTE: Overrun event occurred, should recover from this state.
+				fprintf(stderr, "WARN: ALSA overrun: %s.\r\n", snd_strerror(err));
+				break;
+			case -ESTRPIPE:
+				break;
+				// NOTE: Suspend event occurred, should recover from this state.
+				fprintf(stderr,
+						"WARN: ALSA suspend event occurred: %s.\r\n",
+						snd_strerror(err));
+				break;
+			case -EAGAIN:
+				break;
+				fprintf(stderr, "WARN: ALSA EAGAIN.\r\n");
+				break;
+			default:
+				fprintf(stderr,
+						"WARN: ALSA unexpected error: %s.\r\n",
+						snd_strerror(err));
+				assert(false);
+				break;
+			}
+		}
+		else
+		{
+			snd_pcm_sframes_t avail;
+			snd_pcm_sframes_t delay;
+			//fprintf(stderr, "LOG: read %d values.\r\n", err);
+			snd_pcm_avail_delay(audio_state.record.alsa_handle,
+								&avail,
+								&delay);
+
+			//fprintf(stderr, "LOG: avail=%d\t mdelay=%d.\r\n", avail, delay);
+			how_many_read += err;
+			missing -= err;
+		}
+	}
+}
+
+// TODO: Organize the body of this function into multiple functions with more
+// specialized purposes.
 void* microphone_task(void *arg)
 {
 ptask_t*	tp;			// task pointer
@@ -697,13 +771,13 @@ int			task_id;	// task identifier
 // Local variables
 int		err;
 
-// TODO: do not use local buffer, request a CAB first
 int 	buffer_index;	// index of local buffer used to get microphone data
 						// used to access cab
 short	*buffer;		// pointer to local buffer, changes each execution
 
-int		how_many_read;	// how many frames have been read from the stream
-int		missing;		// how many are missing before the next acquisition
+// TODO: Check wether these two variables are actually needed
+// int		how_many_read;	// how many frames have been read from the stream
+// int		missing;		// how many are missing before the next acquisition
 
 	tp = STATIC_CAST(ptask_t *, arg);
 	task_id = ptask_get_id(tp);
@@ -715,13 +789,32 @@ int		missing;		// how many are missing before the next acquisition
 	if (err)
 		abort_on_error("Could not prepare microphone acquisition.");
 
+	ptask_cab_reserve(&audio_state.record.cab,
+					  STATIC_CAST(void *, &buffer),
+					  &buffer_index);
+	_read_mic_blocking(buffer, audio_state.record.rframes);
+	ptask_cab_putmes(&audio_state.record.cab, buffer_index);
+
+	//fprintf(stderr, "LOG: TASK_MIC STARTING PERIOD!\r\n");
+
+	struct timespec mdelay =
+		{
+			.tv_sec = 0,
+			.tv_nsec = 20000000 // 20 millis
+		};
+	struct timespec remaining;
+
+	while (clock_nanosleep(CLOCK_MONOTONIC, 0, &mdelay, &remaining) != 0)
+	{
+		mdelay = remaining;
+	}
+
 	ptask_start_period(tp);
+	ptask_wait_for_period(tp);
+	//ptask_wait_for_period(tp);
 
 	while (!main_get_tasks_terminate())
 	{
-		how_many_read	= 0;
-		missing			= audio_state.record.rframes;
-
 		// Get a local buffer from the CAB TODO: check wether this is fine
 		// It never fails if the number of tasks is strictly less than the
 		// number of available CABs, otherwise the behavior is unspecified
@@ -729,61 +822,26 @@ int		missing;		// how many are missing before the next acquisition
 			STATIC_CAST(void*, &buffer),
 			&buffer_index);
 
-		// TODO: Move capture to another function
-
 		// Capture audio from stream and write it to assigned CAB
-		while (missing > 0)
-		{
-			err = snd_pcm_readi(audio_state.record.alsa_handle,
-				STATIC_CAST(void *, buffer + how_many_read),
-				missing);
+		_read_mic_blocking(buffer, audio_state.record.rframes);
 
-			// TODO: once we have timed waits, decide how to handle better
-			// undersampling
-
-			if (err < 0)
-			{
-				switch (err)
-				{
-				case -EBADFD:
-					fprintf(stderr,
-							"ALSA device was not in correct state: %s.\r\n",
-							snd_strerror(err));
-					assert(false);
-					break;
-				case -EPIPE:
-					// TODO: Overrun
-					fprintf(stderr, "WARN: ALSA overrun: %s.\r\n", snd_strerror(err));
-					break;
-				case -ESTRPIPE:
-					// TODO: Suspend event occurred
-					fprintf(stderr,
-							"WARN: ALSA suspend event occurred: %s.\r\n",
-							snd_strerror(err));
-					break;
-				case -EAGAIN:
-					fprintf(stderr, "WARN: ALSA EAGAIN.\r\n");
-					break;
-				default:
-					fprintf(stderr,
-							"WARN: ALSA unexpected error: %s.\r\n",
-							snd_strerror(err));
-					assert(false);
-					break;
-				}
-			}
-			else
-			{
-				fprintf(stderr, "LOG: read %d values.\r\n", err);
-				how_many_read	+= err;
-				missing			-= err;
-			}
-		}
+		// Compute FFT
+		/*
+		fftw_complex *in, *out;
+		fftw_plan p;
+		in = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * N);
+		out = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * N);
+		p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
+		fftw_execute(p); // repeat as needed
+		fftw_destroy_plan(p);
+		fftw_free(in);
+		fftw_free(out);
+		*/
 
 		// Release CAB to apply changes
 		ptask_cab_putmes(&audio_state.record.cab, buffer_index);
 
-		// TODO: how do I know from within another thread wether this is new
+		// TODO: How do I know from within another thread wether this is new
 		// data or data already read from that very thread?
 
 		if (ptask_deadline_miss(tp))

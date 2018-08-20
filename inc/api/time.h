@@ -4,8 +4,9 @@
 // Time management utility functions
 // Inspired by the functions shown by Professor Giorgio Buttazzo
 
-// TODO: the void functions are unsafe, pointers should always be checked and
-// a value should always be returned to the caller.
+// NOTICE: it is true that in general void functions are unsafe, because values
+// specified by pointers should always be checked and a value should always be
+// returned to the caller.
 // On the other hand, if the value provided is invalid we can always say that
 // the behavior is undefined, after all the correctness of the arguments is a
 // duty of the caller.

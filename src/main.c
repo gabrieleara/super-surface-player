@@ -32,6 +32,9 @@
  // Global state of the program
 typedef struct __MAIN_STRUCT
 {
+	// NOTE: When modifying the main_state_t data structure, consider
+	// which state should be adopted as default state.
+
 	bool			tasks_terminate;// tells if concurrent tasks should stop
 									// their execution
 	bool			quit;			// tells if the program is shutting down
@@ -46,14 +49,15 @@ typedef struct __MAIN_STRUCT
 	ptask_cond_t	cond;			// used to wake up main thread
 } main_state_t;
 
-// TODO: static?
+// NOTE: Consider wether global states of each module should be made static or
+// not, and if so implement required getters/setters if not already done.
+
 main_state_t main_state =
 {
 	.tasks_terminate = false,
 	.quit = false,
 	.verbose = false,
 	.directory = "",
-	// TODO:
 };
 
 /* -----------------------------------------------------------------------------
@@ -81,6 +85,9 @@ int len;
 		printf("Last allegro error is %s.\r\n", allegro_error);
 	/*}*/
 
+	// NOTE: A negative error may be due to ALSA library, consider using
+	// snd_strerr to print the error.
+
 	exit(EXIT_FAILURE);
 }
 
@@ -107,7 +114,10 @@ int err = 0;
 			main_state.verbose = true;
 		break;
 
-	// TODO: add other arguments
+	// NOTE: More command line arguments may be placed.
+	// IDEA: Implement a command line that automatically updates WCET for each
+	// task during program execution and prints at the end of each concurrent
+	// execution the calculated values for each task.
 
 	default:
 		// Unknown argument
@@ -340,7 +350,8 @@ int err;
 		else if (strcmp(command, "play") == 0)
 			start_graphic_mode = true;
 		else if (strcmp(command, "record") == 0)
-			;// TODO: record
+			; 	// TODO: This command should be used to associate a recording to
+				// an opened file id.
 		else if(strlen(command) < 1)
 			; // Do nothing
 		else
@@ -368,11 +379,12 @@ int start_gui_task()
 			TASK_GUI_PERIOD,
 			TASK_GUI_DEADLINE,
 			GET_PRIO(TASK_GUI_PRIORITY),
-			gui_task); // FIXME: define this task
+			gui_task);
 }
 
 int start_ui_task()
 {
+#ifdef NDEBUG
 	return
 		ptask_short(
 			&main_state.tasks[TASK_UI],
@@ -380,12 +392,15 @@ int start_ui_task()
 			TASK_UI_PERIOD,
 			TASK_UI_DEADLINE,
 			GET_PRIO(TASK_UI_PRIORITY),
-			user_interaction_task); // FIXME: define this task
+			user_interaction_task); // FIXME: This task seemed to fail in debug
+									// mode, check it again
+#else
+	return 0;
+#endif
 }
 
 int start_microphone_task()
 {
-	// TODO: change period
 	return
 		ptask_short(
 			&main_state.tasks[TASK_MIC],
@@ -393,14 +408,14 @@ int start_microphone_task()
 			TASK_MIC_PERIOD,
 			TASK_MIC_DEADLINE,
 			GET_PRIO(TASK_MIC_PRIORITY),
-			microphone_task); // FIXME: define this task
-	return 0;
+			microphone_task);
+	//return 0;
 }
 
 int start_fft_task()
 {
 	/*
-	// TODO:
+	// NOTE: Evaluate wether this task is necessary or not.
 	return
 		ptask_short(
 			&main_state.tasks[TASK_FFT],
@@ -408,7 +423,7 @@ int start_fft_task()
 			TASK_FFT_PERIOD,
 			TASK_FFT_DEADLINE,
 			GET_PRIO(TASK_FFT_PRIORITY),
-			fft_task); // FIXME: define this task
+			fft_task);
 	*/
 	return 0;
 }
@@ -416,7 +431,10 @@ int start_fft_task()
 
 int start_analyzer_task()
 {
-	/* TODO:
+	// TODO: This task should be divided between multiple tasks, one for each
+	// opened file with an associated record trigger.
+
+	/*
 	return
 		ptask_short(
 			&main_state.tasks[TASK_ALS],
@@ -424,7 +442,7 @@ int start_analyzer_task()
 			TASK_ALS_PERIOD,
 			TASK_ALS_DEADLINE,
 			GET_PRIO(TASK_ALS_PRIORITY),
-			analyzer_task); // FIXME: define this task
+			analyzer_task);
 	*/
 	return 0;
 }
@@ -432,11 +450,11 @@ int start_analyzer_task()
 /*
  * Aborts the task specified by the id. It is unsafe, since the task will leave
  * all data structures in a dirty condition, so it shall be called only when
- * closing the program if necessary.
+ * closing the program if necessary. Also, it assumes that the task is in
+ * cancelable state when called.
  */
 void abort_task(int task_id)
 {
-	// FIXME: unsafe, assumes that the task task_id is cancelable.
 	ptask_cancel(&main_state.tasks[task_id]);
 	ptask_join(&main_state.tasks[task_id]);
 }
@@ -473,7 +491,8 @@ int err;
  */
 void _join_tasks()
 {
-// TODO:
+// TODO: Update this function to reflect new tasks organization.
+
 // int i;
 	// for (i = 0; i < TASK_NUM; ++i)
 	// 	ptask_join(&main_state.tasks[i]);

@@ -24,7 +24,8 @@
         "stdbool.h": "c",
         "ptask.h": "c",
         "cstdlib": "c",
-        "libgen.h": "c"
+        "libgen.h": "c",
+        "fftw3.h": "c"
     },
     "files.trimTrailingWhitespace": true,
     "C_Cpp.intelliSenseEngine": "Default",

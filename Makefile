@@ -32,7 +32,7 @@ OBJECTS = $(addprefix $(DIR_OBJ)/,$(SOURCES:.c=.o))
 #---------------------------------------------------
 
 # Phony tagets are always executed
-# TODO: help
+# IDEA: The help command should print what are the accepted make commands
 .PHONY: main directories compile clean clean-dep debug compile-debug super help
 
 # Compiler
@@ -45,7 +45,7 @@ CFLAGS += -Wall -Wextra -pedantic
 INCLUDES = -iquote inc
 
 # Linking options
-LDLIBS = -lpthread -lm -lrt -lasound
+LDLIBS = -lpthread -lm -lrt -lasound -lfftw3
 LDALLEGRO = `allegro-config --libs`
 
 # Adds includes declaration in COMPILE.c rule, so that CFLAGS/CPPFLAGS are
@@ -67,7 +67,7 @@ MKDIR = mkdir -p
 main: directories compile super
 
 # Default compilation command
-# FIXME: in this case resources are always copied from res to distribution folder
+# NOTICE: in this case resources are always copied from res to distribution folder
 compile: CFLAGS += -D NDEBUG
 compile: $(DEST)
 	cp -R $(DIR_RES) $(DIR_DIS)
@@ -118,8 +118,8 @@ $(DIR_OBJ)/%.o: %.c
 	$(COMPILE.c) $(OUTPUT_OPTION) $<
 
 
-# Ugly rules used to auto-generate dependency rules
-# Place a hyphen before include to suppress warning
+# Horrible rules used to auto-generate dependency rules
+# The hyphen before `include` is used to suppress unnecessary warnings
 DEPENDENCIES = $(addprefix $(DIR_DEP)/,$(SOURCES))
 
 -include $(subst .c,.d,$(DEPENDENCIES))

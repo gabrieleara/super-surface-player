@@ -59,8 +59,6 @@ typedef pthread_cond_t ptask_cond_t;
 #define PTASK_CAB_MAX		(50)	// maximum number of cabs per process
 #define PTASK_CAB_MAX_SIZE	(10)	// maximum number of buffers inside a cab
 
-// TODO: make some attributes "private"
-
 typedef struct __PTASK_CAB
 {
 	int	id;							// identificator of the cab
@@ -83,7 +81,7 @@ typedef int ptask_cab_id_t;
 // LIBRARY PUBLIC FUNCTIONS
 //-------------------------------------------------------------
 
-// NOTE: to avoid concurrecy problems, the thread functions are unsafe for
+// NOTICE: to avoid concurrecy problems, the thread functions are unsafe for
 // their argument values, i.e. no checks are executed over pointers passed by
 // argument. Deal with it. If the caller uses properly the library, as shown
 // below no problems can arise.
@@ -224,9 +222,9 @@ extern int ptask_cond_broadcast(ptask_cond_t *cond_p);
 /*!
 	Initiaizes a new cab, with the given n buffers, each with the given size.
 
-	Returns zero on success, a non zero value otherwise. In particular, if a new
-	cab cannot be initialized in this moment the
-	TODO: what did I meant here?
+	Returns zero on success, a non zero value otherwise. Notice that if the
+	maximum number of CABs has already been assigned this function will return
+	EINVAL.
 */
 extern int ptask_cab_init(ptask_cab_t *ptask_cab, int n, int size,
 	void *buffers[]);
@@ -310,27 +308,6 @@ extern int ptask_cab_getmes(ptask_cab_t *ptask_cab, void* buffer[],
 */
 extern int ptask_cab_unget(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id);
 
-/*!
-	UNSAFE
-
-	Destroys a given cab.
-
-	Shouldn't be used at all. To erase all the data within a cab in a safe way
-	see ptask_cab_reset. A cab is automatically released after program
-	termination, so this function isn't actually needed at all and should be
-	avoided.
-
-	Returns zero on sucess, a non zero value otherwise.
-
-	NOTE: It has so many unsafe behaviors that they won't be listed here, but
-	notice that inconsistency of data is a big deal.
-
-	AGAIN DO NOT USE. IT'S A VERY BAD IDEA. I SHOULDN'T EVEN HAVE WRITTEN THIS
-	AND IT WILL PROBABLY BE DELETED IN FUTURE REVISIONS.
-*/
-extern int ptask_cab_destroy(ptask_cab_t *ptask_cab);
-
-
 /*
 
 // -----------------------------------------------------------------------------
@@ -375,7 +352,7 @@ void* task_body(void* arg) {
 
 // Just an example of a process using this library
 
-// NOTE: the example doesn't execute any check over the returned values. An
+// NOTICE: the example doesn't execute any check over the returned values. An
 // actual program should always check for success of each call.
 
 

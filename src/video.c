@@ -52,6 +52,8 @@ typedef struct __GUI_STATIC_STRUCT
 // Global state of the module
 typedef struct __GUI_STRUCT
 {
+	// NOTE: When modifying the main_state_t data structure, consider
+	// which state should be adopted as default state.
 
 	BITMAP*		virtual_screen;	// Virtual screen, used to handle all gui
 								// operations, it is copied in the actual screen
@@ -70,8 +72,6 @@ typedef struct __GUI_STRUCT
 
 	ptask_mutex_t mutex;		// This mutex is used to protect the access of
 								// the mouse flags
-
-	// TODO
 } gui_state_t;
 
 typedef enum __BUTTON_ID_ENUM
@@ -86,7 +86,6 @@ typedef enum __BUTTON_ID_ENUM
 	BUTTON_FRQ_UP,
 } button_id_t;
 
-
 /* -----------------------------------------------------------------------------
  * GLOBAL VARIABLES
  * -----------------------------------------------------------------------------
@@ -97,7 +96,6 @@ gui_state_t gui_state =
 	.initialized = false,
 	.mouse_initialized = false,
 	.mouse_shown = false,
-	// TODO:
 };
 
 /* -----------------------------------------------------------------------------
@@ -282,15 +280,80 @@ int num, i;
  */
 void _draw_fft()
 {
-	// TODO:
+	// TODO: To implement this function, try to find again the code that you
+	// wrote more than one year ago!
 }
+
+/*
+#define TIME_P	(PADDING*2)				// time graph padding
+#define TIME_X	(0)						// time graph position x
+#define TIME_Y	(FFT_MY+TIME_P)			// time graph position y
+#define TIME_MX	(SIDE_X)				// time graph max x
+#define TIME_MY (FOOTER_Y)				// time graph max y
+*/
+
+#define TIME_WIDTH	(TIME_MX - TIME_X - 2*TIME_P)
+#define TIME_HEIGHT	(TIME_MY - TIME_Y - 2*TIME_P)
 
 /*
  * Draws the amplitude of the input signal on the screen.
  */
 void _draw_amplitude()
 {
-	// TODO:
+// NOTE: Consider changing the organization of this function and to adopt more
+// global variables/constants
+static BITMAP *amplitude_bitmap;
+static bool first = true;
+#define AMPLITUDE_SPEED 1
+#define AMPLITUDE_MAX	120
+static int amplitude = 17;
+
+	if (first)
+	{
+		amplitude_bitmap = create_bitmap(TIME_WIDTH, TIME_HEIGHT);
+
+		blit(gui_state.virtual_screen, amplitude_bitmap,
+			TIME_X + TIME_P,
+			TIME_Y + TIME_P,
+			0,
+			0,
+			TIME_WIDTH,
+			TIME_HEIGHT);
+
+		first = false;
+	}
+
+	// TODO: Change with the real amplitude detected by the microphone.
+	amplitude = (amplitude * 1456486512 % 14564561) % AMPLITUDE_MAX;
+
+	blit(amplitude_bitmap, gui_state.virtual_screen,
+		 AMPLITUDE_SPEED,
+		 0,
+		 TIME_X + TIME_P,
+		 TIME_Y + TIME_P,
+		 TIME_WIDTH - AMPLITUDE_SPEED,
+		 TIME_HEIGHT);
+
+	// NOTE: This code should be adopted with a better plotting function.
+	// The function shall print on a width equal to AMPLITUDE_SPEED pixels
+	// on each execution a value that is proportional to the amplitude collected
+	// above. The function shall use scaling and other constants to control its
+	// behavior.
+	rectfill(gui_state.virtual_screen,
+			 TIME_MX - TIME_P - AMPLITUDE_SPEED - 1,
+			 TIME_Y + 3*TIME_P + (AMPLITUDE_MAX - amplitude),
+			 TIME_MX - TIME_P - 1,
+			 TIME_MY - TIME_P - 1,
+			 COLOR_ACCENT);
+
+	blit(gui_state.virtual_screen, amplitude_bitmap,
+		TIME_X + TIME_P,
+		TIME_Y + TIME_P,
+		0,
+		0,
+		TIME_WIDTH,
+		TIME_HEIGHT);
+
 }
 
 /*
@@ -377,7 +440,7 @@ int scancode;
 			case KEY_Q:
 				main_terminate_tasks();
 				break;
-				// TODO: application volume up and down
+			// IDEA: Implement global volume controls, Up/Down.
 			default:
 				// Do nothing
 				break;
@@ -507,7 +570,7 @@ static struct timespec current_time;
 	pos = mouse_pos;
 	pressed = mouse_b & 1;
 
-	// TODO: move to macro
+	// TODO: Move these operations to a macro.
 	x = pos >> 16;
 	y = pos & 0x0000FFFF;
 
@@ -525,7 +588,8 @@ static struct timespec current_time;
 		{
 			_handle_click(button_hover, elem_id);
 			clock_gettime(CLOCK_MONOTONIC, &next_click_time);
-			time_add_ms(&next_click_time, 500); // TODO:
+			time_add_ms(&next_click_time, 500);
+									// TODO: Move this value to a global constant.
 		}
 	} else
 	{
@@ -533,9 +597,10 @@ static struct timespec current_time;
 		{
 			// First click is handled
 			_handle_click(button_hover, elem_id);
-
 			clock_gettime(CLOCK_MONOTONIC, &next_click_time);
-			time_add_ms(&next_click_time, 500); // TODO:
+			time_add_ms(&next_click_time, 500);
+									// TODO: Same as above, also consider
+									// writing an inline function to do this job.
 		} else if (pressed && pressed_past)
 		{
 			// On the same potion, if long press then timers come into game
@@ -548,7 +613,8 @@ static struct timespec current_time;
 				_handle_click(button_hover, elem_id);
 
 				time_copy(&next_click_time, current_time);
-				time_add_ms(&next_click_time, 15); // TODO:
+				time_add_ms(&next_click_time, 15);
+									// TODO: Move this value to a global constant.
 			}
 		}
 	}
@@ -579,7 +645,7 @@ int err;
 	return err;
 }
 
-// TODO: move the following functions in the private part
+// NOTE: Some of these functions may be moved to private part.
 
 /*
  * Initializes the graphic mode by creating a new window.
@@ -685,8 +751,6 @@ int err;
 
 	while (!main_get_tasks_terminate())
 	{
-		// TODO: mouse, many keyboard inputs
-
 		_handle_keyboard_inputs();
 
 		_handle_mouse_input();
