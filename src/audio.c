@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <libgen.h>			// Used for basename
+#include <complex.h>		// Used for C99 standard complex numbers in fftw3
 
 #include <assert.h>			// Used in debug
 
@@ -107,7 +108,18 @@ typedef struct __AUDIO_RECORD_STRUCT
 // Status of the resources used to perform fft
 typedef struct __AUDIO_FFT_STRUCT
 {
-	// TODO: Add variables
+	unsigned int rrate;		// Recording acquisition ratio, as accepted by the
+							// device
+	snd_pcm_uframes_t rframes;
+							// Period requested to recorder task, expressed in
+							// terms of number of frames
+
+	fftw_plan plan;		// The plan used to perform FFT
+
+	double buffers[AUDIO_NUM_BUFFERS][AUDIO_DESIRED_FRAMES];
+							// Buffers used within the cab, their structure is
+							// the one of an Halfcomplex-formatted FFT
+	ptask_cab_t cab;		// CAB used to handle allocated buffers
 
 } audio_fft_t;
 
@@ -301,12 +313,13 @@ snd_pcm_t *alsa_handle;			// ALSA Hardware Handle used to record audio
 	err = _install_alsa_recorder(&alsa_handle, &rrate, &rframes);
 	if (err) return err;
 
+	// Construction of CAB pointers
 	for (index = 0; index < AUDIO_NUM_BUFFERS; ++index)
 	{
 		cab_pointers[index] = STATIC_CAST(void*, audio_state.record.buffers[index]);
 	}
 
-	// Initializing the capture CAB buffers
+	// Initializing capture CAB buffers
 	err = ptask_cab_init(&audio_state.record.cab,
 		AUDIO_NUM_BUFFERS,
 		AUDIO_DESIRED_FRAMES,
@@ -314,10 +327,46 @@ snd_pcm_t *alsa_handle;			// ALSA Hardware Handle used to record audio
 
 	if (err) return err;
 
-	// Copy local vales to global structure
+	// Initializing FFT
+	double *inout;
+	fftw_plan fft_plan;
+	inout = (double*) fftw_malloc(sizeof(double) * rframes);
+
+	// The returned plan is guaranteed not to be NULL
+	fft_plan = fftw_plan_r2r_1d(rframes,
+						 inout,
+						 inout,
+						 FFTW_R2HC,
+						 FFTW_EXHAUSTIVE); // OR FFTW_PATIENT
+
+	// TODO: Implement wisdom saving/retrieval
+
+	// fftw_execute_r2r(const fftw_plan p, double *in, double *out);
+
+	fftw_free(inout);
+
+	// Construction of CAB pointers
+	for (index = 0; index < AUDIO_NUM_BUFFERS; ++index)
+	{
+		cab_pointers[index] = STATIC_CAST(void *, audio_state.fft.buffers[index]);
+	}
+
+	// Initializing FFT CAB buffers
+	err = ptask_cab_init(&audio_state.fft.cab,
+						 AUDIO_NUM_BUFFERS,
+						 AUDIO_DESIRED_FRAMES,
+						 cab_pointers);
+
+	if (err) return err;
+
+	// Copy local vales to global structures
 	audio_state.record.rrate		= rrate;
 	audio_state.record.rframes		= rframes;
 	audio_state.record.alsa_handle	= alsa_handle;
+
+	audio_state.fft.rrate			= rrate;
+	audio_state.fft.rframes			= rframes;
+	audio_state.fft.plan			= fft_plan;
 
 	return 0;
 }
@@ -722,6 +771,34 @@ void audio_frequency_down(int i)
 	ptask_mutex_unlock(&audio_state.mutex);
 }
 
+
+/*
+ * Fetches the most recent buffer acquired by the microphone using the CAB.
+ * Returns its dimension or -EAGAIN if no data is available.
+ */
+int audio_get_last_record(short* buffer_ptr[], int* buffer_index_ptr)
+{
+int err;
+
+	err = ptask_cab_getmes(&audio_state.record.cab,
+		STATIC_CAST(void**, buffer_ptr),
+		buffer_index_ptr,
+		NULL);
+
+	if (err)
+		return -EINVAL;
+
+	return audio_state.record.rframes;
+}
+
+/*
+ * Frees a previously acquired audio buffer.
+ */
+void audio_free_last_record(int buffer_index)
+{
+	ptask_cab_unget(&audio_state.record.cab, buffer_index);
+}
+
 /* -----------------------------------------------------------------------------
  * TASKS
  * -----------------------------------------------------------------------------
@@ -846,7 +923,7 @@ int missing = nframes;	// How many frames are still missing
 void* microphone_task(void *arg)
 {
 ptask_t*	tp;			// task pointer
-int			task_id;	// task identifier
+// int			task_id;	// task identifier
 
 // Local variables
 int		err;
@@ -859,7 +936,7 @@ int		how_many_read;	// How many frames are already in the buffer
 int		missing;		// How many frames are missing
 
 	tp = STATIC_CAST(ptask_t *, arg);
-	task_id = ptask_get_id(tp);
+	// task_id = ptask_get_id(tp);
 
 	// Variables initialization and initial computation
 
@@ -890,38 +967,20 @@ int		missing;		// How many frames are missing
 
 			if (missing == 0)
 			{
-				// TODO: How do I know from within another thread wether this
-				// is new data or data already read from that very thread?
-
 				// Update most recent acquisition and request a new CAB
-				// Release CAB to apply changes
+				// Release CAB to apply changes, a timestamp will be added to
+				// the new data
 				ptask_cab_putmes(&audio_state.record.cab, buffer_index);
 
 				// Get a local buffer from the CAB
 				// There is no check because it never fails if used correcly
 				ptask_cab_reserve(&audio_state.record.cab,
-								  STATIC_CAST(void *, &buffer),
+								  STATIC_CAST(void**, &buffer),
 								  &buffer_index);
 				how_many_read	= 0;
 				missing			= audio_state.record.rframes;
 			}
 		}
-
-		// TODO: Move the FFT code to another task.
-		// Compute FFT
-		/*
-		fftw_complex *in, *out;
-		fftw_plan p;
-		in = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * N);
-		out = (fftw_complex *)fftw_malloc(sizeof(fftw_complex) * N);
-		p = fftw_plan_dft_1d(N, in, out, FFTW_FORWARD, FFTW_ESTIMATE);
-		fftw_execute(p); // repeat as needed
-		fftw_destroy_plan(p);
-		fftw_free(in);
-		fftw_free(out);
-		*/
-
-		printf("Index: %d.\r\n", buffer_index);
 
 		if (ptask_deadline_miss(tp))
 			printf("TASK_MIC missed %d deadlines!\r\n", ptask_get_dmiss(tp));
@@ -937,6 +996,88 @@ int		missing;		// How many frames are missing
 	// The reset can be done here because the only task that reserves buffers
 	// for writing purposes is this one
 	ptask_cab_reset(&audio_state.record.cab);
+
+	return NULL;
+}
+
+void *fft_task(void *arg)
+{
+ptask_t *tp; // task pointer
+// int task_id; // task identifier
+
+// Local variables
+int err;
+
+struct timespec last_timestamp = { .tv_sec = 0, .tv_nsec = 0};
+						// Timestamp of last accessed input buffer
+struct timespec new_timestamp;
+						// Timestamp of the new input buffer
+
+int in_buffer_index;	// Index of local buffer used to get microphone data
+short *in_buffer;		// Pointer to local input buffer
+
+int out_buffer_index;	// Index of local buffer used to produce fft data
+double *out_buffer;		// Pointer to local output buffer
+
+unsigned int i;			// Index used to copy data
+
+	tp = STATIC_CAST(ptask_t *, arg);
+	// task_id = ptask_get_id(tp);
+
+	// Variables initialization and initial computation
+
+	ptask_start_period(tp);
+
+	while (!main_get_tasks_terminate())
+	{
+		err = ptask_cab_getmes(&audio_state.record.cab,
+						STATIC_CAST(void **, &in_buffer),
+						&in_buffer_index,
+						&new_timestamp);
+
+		// If the acquired buffer has not been analyzed yet
+		if (err != EAGAIN && time_cmp(last_timestamp, new_timestamp) < 0)
+		{
+			last_timestamp = new_timestamp;
+
+			// Get buffer on which operate
+			ptask_cab_reserve(&audio_state.fft.cab,
+							STATIC_CAST(void **, &out_buffer),
+							&out_buffer_index);
+
+			// Copy data onto new buffer
+			for (i = 0; i < audio_state.fft.rframes; ++i)
+			{
+				out_buffer[i] = (double)in_buffer[i];
+			}
+
+			// Calculate in-place FFT using the plan computed above on
+			// current buffer
+			fftw_execute_r2r(audio_state.fft.plan, out_buffer, out_buffer);
+
+			// Publish new FFT
+			ptask_cab_putmes(&audio_state.fft.cab, out_buffer_index);
+		}
+		// Otherwise, do nothing
+
+		// Realease acquired buffer
+		if (err == 0)
+			ptask_cab_unget(&audio_state.record.cab, in_buffer_index);
+
+		if (ptask_deadline_miss(tp))
+			printf("TASK_FFT missed %d deadlines!\r\n", ptask_get_dmiss(tp));
+
+		ptask_wait_for_period(tp);
+	}
+
+	// Cleanup
+	// Releasing unused half-empty buffer, this is needed because the reset does
+	// not release any buffer that was previously reserved
+	//ptask_cab_unget(&audio_state.record.cab, buffer_index);
+
+	// The reset can be done here because the only task that reserves buffers
+	// for writing purposes is this one
+	ptask_cab_reset(&audio_state.fft.cab);
 
 	return NULL;
 }

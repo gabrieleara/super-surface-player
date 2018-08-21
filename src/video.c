@@ -295,18 +295,44 @@ void _draw_fft()
 #define TIME_WIDTH	(TIME_MX - TIME_X - 2*TIME_P)
 #define TIME_HEIGHT	(TIME_MY - TIME_Y - 2*TIME_P)
 
+int _compute_last_amplitude()
+{
+int buffer_index;
+int i;
+short* buffer;
+double amplitude = 0;
+
+	int dim = audio_get_last_record(&buffer, &buffer_index);
+
+	if (dim > 0)
+	{
+		for (i = 0; i < dim; ++i)
+		{
+			amplitude +=
+				STATIC_CAST(double, buffer[i]) * STATIC_CAST(double, buffer[i]);
+		}
+
+		audio_free_last_record(buffer_index);
+
+		amplitude /= (double) dim;
+	}
+
+	return (int) amplitude;
+}
+
 /*
  * Draws the amplitude of the input signal on the screen.
  */
 void _draw_amplitude()
 {
-// NOTE: Consider changing the organization of this function and to adopt more
+// TODO: Consider changing the organization of this function and to adopt more
 // global variables/constants
 static BITMAP *amplitude_bitmap;
 static bool first = true;
 #define AMPLITUDE_SPEED 1
-#define AMPLITUDE_MAX	120
-static int amplitude = 17;
+#define AMPLITUDE_MAX_HEIGHT (TIME_MY - TIME_P - 1) - (TIME_Y + 3 * TIME_P)
+#define AMPLITUDE_MAX			1000000
+int amplitude;
 
 	if (first)
 	{
@@ -323,16 +349,28 @@ static int amplitude = 17;
 		first = false;
 	}
 
-	// TODO: Change with the real amplitude detected by the microphone.
-	amplitude = (amplitude * 1456486512 % 14564561) % AMPLITUDE_MAX;
+	amplitude = _compute_last_amplitude();
 
 	blit(amplitude_bitmap, gui_state.virtual_screen,
-		 AMPLITUDE_SPEED,
-		 0,
-		 TIME_X + TIME_P,
-		 TIME_Y + TIME_P,
-		 TIME_WIDTH - AMPLITUDE_SPEED,
-		 TIME_HEIGHT);
+			AMPLITUDE_SPEED,
+			0,
+			TIME_X + TIME_P,
+			TIME_Y + TIME_P,
+			TIME_WIDTH - AMPLITUDE_SPEED,
+			TIME_HEIGHT);
+
+#define AMP_TO_HEIGHT(ampl) \
+	STATIC_CAST(int, \
+		((STATIC_CAST(double,AMPLITUDE_MAX_HEIGHT) * \
+		STATIC_CAST(double,amplitude)) / \
+		STATIC_CAST(double,AMPLITUDE_MAX)\
+		) \
+	)
+
+	amplitude = AMP_TO_HEIGHT(amplitude);
+
+	amplitude = (amplitude > AMPLITUDE_MAX_HEIGHT) ?
+		AMPLITUDE_MAX_HEIGHT : amplitude;
 
 	// NOTE: This code should be adopted with a better plotting function.
 	// The function shall print on a width equal to AMPLITUDE_SPEED pixels
@@ -341,7 +379,7 @@ static int amplitude = 17;
 	// behavior.
 	rectfill(gui_state.virtual_screen,
 			 TIME_MX - TIME_P - AMPLITUDE_SPEED - 1,
-			 TIME_Y + 3*TIME_P + (AMPLITUDE_MAX - amplitude),
+			 TIME_MY - TIME_P - 1 - amplitude,
 			 TIME_MX - TIME_P - 1,
 			 TIME_MY - TIME_P - 1,
 			 COLOR_ACCENT);
@@ -687,13 +725,13 @@ int err;
 
 void* gui_task(void* arg) {
 ptask_t*	tp;			// task pointer
-int			task_id;	// task identifier
+// int			task_id;	// task identifier
 
 // Local variables
 int err;
 
 	tp = STATIC_CAST(ptask_t*, arg);
-	task_id = ptask_get_id(tp);
+	// task_id = ptask_get_id(tp);
 
 	// Variables initialization and initial computation
 
@@ -723,13 +761,13 @@ int err;
 
 void* user_interaction_task(void* arg) {
 ptask_t*	tp;			// task pointer
-int			task_id;	// task identifier
+// int			task_id;	// task identifier
 
 // Local variables
 int err;
 
 	tp = STATIC_CAST(ptask_t*, arg);
-	task_id = ptask_get_id(tp);
+	// task_id = ptask_get_id(tp);
 
 	// Variables initialization and initial computation
 

@@ -25,7 +25,8 @@
         "ptask.h": "c",
         "cstdlib": "c",
         "libgen.h": "c",
-        "fftw3.h": "c"
+        "fftw3.h": "c",
+        "string_view": "c"
     },
     "files.trimTrailingWhitespace": true,
     "C_Cpp.intelliSenseEngine": "Default",

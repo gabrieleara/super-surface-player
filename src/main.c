@@ -409,8 +409,6 @@ int start_microphone_task()
 
 int start_fft_task()
 {
-	/*
-	// NOTE: Evaluate wether this task is necessary or not.
 	return
 		ptask_short(
 			&main_state.tasks[TASK_FFT],
@@ -419,8 +417,6 @@ int start_fft_task()
 			TASK_FFT_DEADLINE,
 			GET_PRIO(TASK_FFT_PRIORITY),
 			fft_task);
-	*/
-	return 0;
 }
 
 
