@@ -280,6 +280,10 @@ int num, i;
  */
 void _draw_fft()
 {
+double *buffer;
+int rate;
+int frames;
+
 	// TODO: To implement this function, try to find again the code that you
 	// wrote more than one year ago!
 }
@@ -393,6 +397,7 @@ int amplitude;
 		TIME_HEIGHT);
 
 }
+
 
 /*
  * Calls Allegro show_mouse(screen) if the mouse module has been initialized,
@@ -738,6 +743,8 @@ int err;
 	err = gui_graphic_mode_init();
 	if (err)
 		abort_on_error("Could not initialize graphic mode.");
+
+	// FIXME: Clear virtual screen content!
 
 	ptask_start_period(tp);
 

@@ -799,6 +799,33 @@ void audio_free_last_record(int buffer_index)
 	ptask_cab_unget(&audio_state.record.cab, buffer_index);
 }
 
+/*
+ * Fetches the most recent buffer produced by FFT task using the CAB.
+ * Returns its dimension or -EAGAIN if no data is available.
+ */
+int audio_get_last_fft(short *buffer_ptr[], int *buffer_index_ptr)
+{
+	int err;
+
+	err = ptask_cab_getmes(&audio_state.fft.cab,
+						   STATIC_CAST(void **, buffer_ptr),
+						   buffer_index_ptr,
+						   NULL);
+
+	if (err)
+		return -EINVAL;
+
+	return audio_state.fft.rframes;
+}
+
+/*
+ * Frees a previously acquired fft buffer.
+ */
+void audio_free_last_fft(int buffer_index)
+{
+	ptask_cab_unget(&audio_state.fft.cab, buffer_index);
+}
+
 /* -----------------------------------------------------------------------------
  * TASKS
  * -----------------------------------------------------------------------------
