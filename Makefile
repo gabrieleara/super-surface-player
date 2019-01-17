@@ -21,11 +21,13 @@ DIRECTORIES = $(DIR_OBJ) $(DIR_DIS) $(DIR_DEP) $(DIR_TEST)
 DEST = $(DIR_DIS)/super
 
 # Object files related to source files
-APIS_SRC = time.c ptask.c
+APIS_SRC = time_utils.c ptask.c
 MODULES_SRC = main.c audio.c video.c
 
 SOURCES = $(APIS_SRC) $(MODULES_SRC)
 OBJECTS = $(addprefix $(DIR_OBJ)/,$(SOURCES:.c=.o))
+
+DOXFLAGS = > /dev/null 2> /dev/null
 
 #---------------------------------------------------
 # Flags
@@ -33,7 +35,7 @@ OBJECTS = $(addprefix $(DIR_OBJ)/,$(SOURCES:.c=.o))
 
 # Phony tagets are always executed
 # IDEA: The help command should print what are the accepted make commands
-.PHONY: main directories compile clean clean-dep debug compile-debug super help
+.PHONY: main directories compile clean clean-dep debug compile-debug super help docs docs-verbose
 
 # Compiler
 CC = gcc
@@ -59,12 +61,15 @@ COMPILE.c += $(INCLUDES)
 # Make directory
 MKDIR = mkdir -p
 
+# Doxygen command
+DOXYGEN = doxygen docs/Doxyfile.in
+
 #---------------------------------------------------
 # Phony Rules
 #---------------------------------------------------
 
 # Default make command
-main: directories compile super
+main: directories compile docs super
 
 # Default compilation command
 # NOTICE: in this case resources are always copied from res to distribution folder
@@ -90,6 +95,11 @@ compile-debug: LDFLAGS += -ggdb
 compile-debug: $(DEST)
 	cp -R $(DIR_RES) $(DIR_DIS)
 
+docs:
+	$(DOXYGEN) $(DOXFLAGS)
+
+docs-verbose: DOXFLAGS =
+docs-verbose: docs
 
 # Enabling Real-Time Scheduling (since superuser privileges are required)
 super:

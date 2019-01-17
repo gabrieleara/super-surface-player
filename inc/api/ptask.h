@@ -1,8 +1,16 @@
+/**
+ * @file ptask.h
+ * @brief Periodic tasks utility functions
+ *
+ * @author Gabriele Ara
+ * @date 2019/01/17
+ *
+ * Inspired by the functions shown by Professor Giorgio Buttazzo during his
+ * Real-Time Systems class.
+ */
+
 #ifndef PTASKS_H
 #define PTASKS_H
-
-// Periodic tasks utility functions
-// Inspired by the functions shown by Professor Giorgio Buttazzo
 
 // Following macro is needed because Intellisense fails to find the following macros:
 // PTHREAD_PRIO_NONE,
@@ -26,6 +34,13 @@
 
 #define PTASK_MAX	(50)
 
+/** The possible states in which a task can be:
+ * - PS_FREE: the task has not been associated with any actual job
+ * - PS_NEW: the task has been reserved for a job that hasn't started yet
+ * - PS_JOINABLE: the task has been started, thus it it either waiting to be
+ * executed by the scheduler, running or terminated and it can be joined.
+ * - PS_ERROR: for an erroneous task state.
+ */
 typedef enum __PTASK_ENUM {
 	PS_ERROR = -1,
 	PS_FREE = 0,
@@ -34,21 +49,23 @@ typedef enum __PTASK_ENUM {
 	PS_JOINABLE
 } ptask_state_t;
 
+/** The structure representing a task.
+ */
 typedef struct __PTASK_STRUCT
 {
-	int id;				// identificator of a ptask
-	long wcet;			// worst case execution time (in us): 0 means unknown
-	int period;			// in milliseconds
-	int deadline;		// relative to activation time (in ms)
-	int priority;		// value between [0,99], standard should be in [0,32]
-	int dmiss;			// no. of occurred deadline misses
-	struct timespec at;	// next activ. time
-	struct timespec dl;	// next abs. deadline
+	int id;				///< identificator of a ptask
+	long wcet;			///< worst case execution time (in us): 0 means unknown
+	int period;			///< in milliseconds
+	int deadline;		///< relative to activation time (in ms)
+	int priority;		///< value between [0,99], standard should be in [0,32]
+	int dmiss;			///< no. of occurred deadline misses
+	struct timespec at;	///< next activ. time
+	struct timespec dl;	///< next abs. deadline
 
-	ptask_state_t _state;// state of the ptask, see ptask_state_t
+	ptask_state_t _state;///< state of the ptask, see ptask_state_t
 
-	pthread_t _tid;		// pthread id of the task
-	pthread_attr_t _attr;// pthread params of the task
+	pthread_t _tid;		///< pthread id of the task
+	pthread_attr_t _attr;///< pthread params of the task
 } ptask_t;
 
 

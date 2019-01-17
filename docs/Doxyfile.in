@@ -1,0 +1,6 @@
+INPUT                   = .
+RECURSIVE               = YES
+EXCLUDE                 =
+ENABLE_PREPROCESSING    = YES
+PREDEFINED              = DOXYGEN_SHOULD_SKIP_THIS
+OUTPUT_DIRECTORY        = dist/docs

@@ -5,7 +5,7 @@
 #include <assert.h>
 
 #include "api/std_emu.h"
-#include "api/time.h"
+#include "api/time_utils.h"
 #include "api/ptask.h"
 
 #include "constants.h"
