@@ -1,5 +1,16 @@
-// Periodic tasks utility functions
-// Inspired by the functions shown by Professor Giorgio Buttazzo
+/**
+ * @file ptask.c
+ * @brief Periodic tasks utility functions
+ *
+ * @author Gabriele Ara
+ * @date 2019/01/17
+ *
+ * For actual documentation, chechout the corresponding header file, api/ptask.h.
+ *
+ * Inspired by the functions shown by Professor Giorgio Buttazzo during his
+ * Real-Time Systems class.
+ *
+ */
 
 #include <limits.h>
 #include <errno.h>
@@ -158,19 +169,6 @@ int err;						// used to check for errors and return value
 // LIBRARY PUBLIC FUNCTIONS
 //-------------------------------------------------------------
 
-/*!
-	Sets the scheduler to the given value. Accepted values are
-	- SCHED_OTHER
-	- SCHED_RR
-	- SCHED_FIFO
-	- SCHED_DEADLINE (currently not supported, returns EINVAL)
-
-	All other values will make this function fail, returning EINVAL. On success
-	this function returns 0.
-
-	NOTE: Scheduler should only be set once per process execution, before all
-	other threads than the main thread have been started.
-*/
 int ptask_set_scheduler(int scheduler)
 {
 int ret = 0;	// returned value
@@ -191,15 +189,6 @@ int ret = 0;	// returned value
 	return ret;
 }
 
-/*!
-	Initializes a new ptask; if no new ptasks can be initialized it returns
-	EAGAIN.
-
-	Returns zero otherwise.
-
-	NOTICE: on success this function overwrites any value it is inside the given
-	ptask_t element.
-*/
 int ptask_init(ptask_t *ptask)
 {
 	if (!_ptask_canallocate())
@@ -212,12 +201,6 @@ int ptask_init(ptask_t *ptask)
 	return 0;
 }
 
-/*!
-	Sets each of the indicated parameters of a given ptask.
-	Returns 0 on success, a non zero value otherwise.
-
-	NOTE: this function can be called only before starting the ptask.
-*/
 int ptask_set_params(ptask_t *ptask, long wcet, int period, int deadline, int priority)
 {
 	if (!_ptask_isnew(ptask))
@@ -231,11 +214,6 @@ int ptask_set_params(ptask_t *ptask, long wcet, int period, int deadline, int pr
 	return 0;
 }
 
-/*!
-	Creates a new (previously initialized) ptask and starts its execution with
-	the given body function.
-	Returns 0 on success, a non zero value otherwise.
-*/
 int ptask_create(ptask_t *ptask, ptask_body_t body)
 {
 int err;
@@ -258,11 +236,6 @@ int err;
 	return err;
 }
 
-/*!
-	Destroys a previously initialied ptask but only if the ptask_create
-	function previously failed.
-	Returns 0 on success, a non zero value otherwise.
-*/
 int ptask_destroy(ptask_t *ptask)
 {
 	if (!_ptask_iserror(ptask))
@@ -276,10 +249,6 @@ int ptask_destroy(ptask_t *ptask)
 
 }
 
-/*!
-	Shorthand for the creation of a task.
-	Returns 0 on success, a non zero value otherwise.
-*/
 int ptask_short(ptask_t *ptask,
 	long wcet, int period, int deadline, int priority, ptask_body_t body)
 {
@@ -299,18 +268,7 @@ int err;
 
 	return err;
 }
-
-
-/*!
-	Cancels a previously started ptask, if it is still running.
-	Returns 0 on success, a non zero value otherwise.
-
-	NOTE: this function creates only a cancelation request, thus is not
-	blocking. To be sure that a ptask is actually terminated call ptask_join.
-
-	NOTE: this function may lead global values to inconsistency and should not
-	be used unless the program has to be forcefully terminated.
-*/
+-
 int ptask_cancel(ptask_t *ptask)
 {
 	if (!_ptask_isjoinable(ptask))
@@ -319,10 +277,6 @@ int ptask_cancel(ptask_t *ptask)
 	return pthread_cancel(ptask->_tid);
 }
 
-/*!
-	Waits until a ptask has terminated its execution.
-	Returns 0 on success, a non zero value otherwise.
-*/
 int ptask_join(ptask_t *ptask)
 {
 int err;
@@ -339,13 +293,8 @@ int err;
 	return err;
 }
 
-
 // The following functions should be called by the task itself
 
-/*!
-	Reads the current time and computes the next activation time and the
-	absolute deadline of the task.
-*/
 void ptask_start_period(ptask_t *ptask)
 {
 struct timespec t;
@@ -359,13 +308,6 @@ struct timespec t;
 	time_add_ms(&(ptask->dl), ptask->deadline);
 }
 
-/*!
-	Suspends the calling thread until the next activation and, when awaken,
-	updates activation time and deadline.
-
-	NOTE: Even though the thread calls time_add_ms() after the wake‐up time, the
-	computation is correct.
-*/
 void ptask_wait_for_period(ptask_t *ptask)
 {
 	while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &(ptask->at), NULL) != 0)
@@ -377,10 +319,6 @@ void ptask_wait_for_period(ptask_t *ptask)
 	time_add_ms(&(ptask->dl), ptask->period);
 }
 
-/*!
-	If the thread is still in execution after its deadline, it increments the
-	value of dmiss and returns a non zero value, otherwise returns zero.
-*/
 int ptask_deadline_miss(ptask_t *ptask)
 {
 struct timespec now;
@@ -395,9 +333,10 @@ struct timespec now;
 	return 0;
 }
 
-/*!
-	Getters for ptask attributes
-*/
+//-------------------------------------------------------------
+// GETTERS FOR PTASK ATTRIBUTES
+//-------------------------------------------------------------
+
 int ptask_get_id(ptask_t *ptask)
 {
 	return ptask->id;
@@ -437,10 +376,10 @@ static pthread_once_t _once_mutex_attr;
 									// Used to initialize all the mutexes in the
 									// program
 
-/*!
-	Executed once per program on the first mutex init, it initializes the mutex
-	attributes static global variable.
-*/
+/**
+ * Executed once per program on the first mutex init, it initializes the mutex
+ * attributes static global variable.
+ */
 static void _ptask_init_mutex_attr()
 {
 	pthread_mutexattr_init(&_matt);
@@ -448,11 +387,6 @@ static void _ptask_init_mutex_attr()
 	// NOTE: Change to priority ceiling if needed
 	pthread_mutexattr_setprotocol(&_matt, PTHREAD_PRIO_INHERIT);
 }
-
-// The following functions are wrappers for the corresponding functions of the
-// pthread library, see them for documentation. Arguments used in pthread
-//library that are not shown in these functions interface are handled by this
-// library itself.
 
 int ptask_mutex_init(ptask_mutex_t *mux_p)
 {
@@ -510,7 +444,7 @@ static int _next_cab_id = 1;		// Used to assign the id to the next new
 // In order to destroy safely a cab, a trace of all tasks that are currently
 // using the cab should be kept, forbidding further acquisitions of buffers
 // until all the currently used buffers have been freed. Only when no buffers
-// inside the buffer are used anymore the cab can be destroyed.
+// inside the cab are used anymore the cab could be destroyed.
 
 static inline int _ptask_cab_canallocate()
 {
@@ -522,13 +456,6 @@ static inline int _ptask_cab_next_id()
 	return _next_cab_id++;
 }
 
-/*!
-	Initiaizes a new cab, with the given n buffers, each with the given size.
-
-	Returns zero on success, a non zero value otherwise. Notice that if the
-	maximum number of CABs has already been assigned this function will return
-	EINVAL.
-*/
 int ptask_cab_init(ptask_cab_t *ptask_cab, int n, int size, void *buffers[])
 {
 int i;
@@ -555,15 +482,6 @@ int i;
 	return 0;
 }
 
-/*!
-	Resets the cab last value to no value, as it was just been initialized.
-	Any task using a cab buffer can continue using it without any problem.
-
-	Returns zero on success, a non zero value otherwise.
-
-	NOTE: Make sure that all the readers released their reading buffers before a
-	new value is inserted into the cab.
-*/
 int ptask_cab_reset(ptask_cab_t *ptask_cab)
 {
 	ptask_mutex_lock(&ptask_cab->_mux);
@@ -578,18 +496,6 @@ int ptask_cab_reset(ptask_cab_t *ptask_cab)
 // NOTICE: the following functions assume that the cab is used correctly, hence
 // only n-1 tasks can use the cab.
 
-/*!
-	This function reserves a cab for writing purposes.
-	On success, the buffer pointer given by argument will contain a pointer to
-	the reserved buffer and the b_id pointer will contain the id of the said
-	buffer. This id will be used later to commit any changes applied to the
-	buffer using ptask_cab_putmes.
-
-	It returns zero on success, a non zero value otherwise.
-
-	NOTE: Attempting to reserve a buffer using a non already initialized cab
-	results in undefined behavior.
-*/
 int ptask_cab_reserve(ptask_cab_t *ptask_cab, void* buffer[], ptask_cab_id_t *b_id)
 {
 int i = 0;
@@ -609,24 +515,6 @@ int i = 0;
 	return 0;
 }
 
-
-/*!
-	This function commits the value written in a cab buffer as the new last
-	message put in the cab. It MUST be called after a ptask_cab_reserve call
-	using the b_id value obtained by it and ONLY ONCE.
-
-	On success, the given buffer is set as the container of the last message in
-	the cab.
-
-	It returns zero on success, a non zero value otherwise.
-
-	NOTE: Attempting to put a message inside a non already initialized cab
-	results in undefined behavior.
-
-	NOTE: Attempting to put a message inside a non previously reserved buffer
-	may lead to inconsistency if the buffer is actually being used by only one
-	ptask in readig mode.
-*/
 int ptask_cab_putmes(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id)
 {
 int err = 0;
@@ -647,23 +535,6 @@ int err = 0;
 	return err;
 }
 
-/*!
-	This function reserves a cab for reading purposes.
-	On success, the buffer pointer given by argument will contain a pointer to
-	the reserved buffer and the b_id pointer will contain the id of the said
-	buffer. This id will be used later to release the obtained buffer using
-	ptask_cab_unget.
-
-	Last argument is an OUT argument that contains the timestamp at which said
-	buffer has been produced. Accepts also NULL if non interested.
-
-	It returns zero on success, a non zero value otherwise. In particular,
-	EAGAIN is returned if no value has been put inside the cab or the cab has
-	been resetted using ptask_cab_reset.
-
-	NOTE: Attempting to reserve a buffer using a non already initialized cab
-	results in undefined behavior.
-*/
 int ptask_cab_getmes(ptask_cab_t *ptask_cab, void* buffer[],
 	ptask_cab_id_t *b_id, struct timespec *timestamp)
 {
@@ -675,7 +546,7 @@ int err = 0;
 		err = EAGAIN;
 	else
 	{
-		*b_id		= ptask_cab->last_index;
+		*b_id = ptask_cab->last_index;
 		if (timestamp != NULL)
 			*timestamp	= ptask_cab->timestamp;
 		++ptask_cab->busy[*b_id];
@@ -689,18 +560,6 @@ int err = 0;
 	return err;
 }
 
-/*!
-	This function releases a buffer acquired for reading purposes using the
-	ptask_cab_getmes. It MUST be called after a ptask_cab_getmes call
-	using the b_id value obtained by it and ONLY ONCE.
-
-	It returns zero on success, a non zero value otherwise.
-
-	NOTICE: Attempting to release a buffer within a non already initialized cab
-	results in undefined behavior.
-
-	NOTICE: This can be used also to cancel a reservation request.
-*/
 int ptask_cab_unget(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id)
 {
 int err = 0;

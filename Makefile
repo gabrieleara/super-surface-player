@@ -95,9 +95,11 @@ compile-debug: LDFLAGS += -ggdb
 compile-debug: $(DEST)
 	cp -R $(DIR_RES) $(DIR_DIS)
 
+# Generate documentation (by default suppresses any output)
 docs:
 	$(DOXYGEN) $(DOXFLAGS)
 
+# Generate documentation, but with detailed output
 docs-verbose: DOXFLAGS =
 docs-verbose: docs
 

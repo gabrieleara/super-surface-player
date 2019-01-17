@@ -3,4 +3,5 @@ RECURSIVE               = YES
 EXCLUDE                 =
 ENABLE_PREPROCESSING    = YES
 PREDEFINED              = DOXYGEN_SHOULD_SKIP_THIS
+JAVADOC_AUTOBRIEF       = YES
 OUTPUT_DIRECTORY        = dist/docs
