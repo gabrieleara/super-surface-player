@@ -103,7 +103,7 @@ super:
 
 # Final executable file is created using this rule
 $(DEST): $(OBJECTS) $(LOADLIBES) $(LDLIBS)
-	$(LINK.o) $^ -o $@ $(LDALLEGRO)
+	$(LINK.o) $(OUTPUT_OPTION) $^ $(LDALLEGRO)
 
 # All directories are created using this rule
 $(DIRECTORIES):
@@ -125,6 +125,8 @@ DEPENDENCIES = $(addprefix $(DIR_DEP)/,$(SOURCES))
 -include $(subst .c,.d,$(DEPENDENCIES))
 
 $(DIR_DEP)/%.d: %.c
-	$(CC) -M $(CPPFLAGS) $(INCLUDES) $< > $@.$$$$; \
+	@echo "Generating $@ ..."
+	@$(MKDIR) $(DIR_DEP)
+	@$(CC) -M $(CPPFLAGS) $(INCLUDES) $< > $@.$$$$; \
 	sed 's,\($*\)\.o[ :]*,$(DIR_OBJ)\/\1.o $@ : ,g' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
