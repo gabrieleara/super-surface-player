@@ -6,14 +6,13 @@
  * @date 2019/01/17
  *
  * Implementation of the functions declared in api/time_utils.h.
+ * For documentation, see the corresponding header file.
  *
  * Inspired by the functions shown by Professor Giorgio Buttazzo during his
  * Real-Time Systems class.
  */
 
 #include "api/time_utils.h"
-
-// For the documentation, see the corresponding header file.
 
 void time_copy(struct timespec *td, struct timespec ts)
 {
@@ -40,7 +39,6 @@ int time_cmp(struct timespec t1, struct timespec t2)
 	if (t1.tv_nsec < t2.tv_nsec) return -1;
 	return 0;
 }
-
 
 int time_diff(struct timespec *tdest, struct timespec t2, struct timespec t1) {
 	if(time_cmp(t2, t1) < 0)

@@ -4,4 +4,6 @@ EXCLUDE                 =
 ENABLE_PREPROCESSING    = YES
 PREDEFINED              = DOXYGEN_SHOULD_SKIP_THIS
 JAVADOC_AUTOBRIEF       = YES
+EXTRACT_STATIC          = YES
 OUTPUT_DIRECTORY        = dist/docs
+PROJECT_NAME            = SUPER - SUrface PlayER

@@ -205,7 +205,7 @@ typedef struct __PTASK_CAB
  * This alias is useful when defining pointers to functions that can be
  * tasks bodies.
  */
-typedef void* (*ptask_body_t) (void*);
+typedef void* (ptask_body_t) (void*);
 
 /**
  * The type of a CAB identifier

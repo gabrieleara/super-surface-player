@@ -214,7 +214,7 @@ int ptask_set_params(ptask_t *ptask, long wcet, int period, int deadline, int pr
 	return 0;
 }
 
-int ptask_create(ptask_t *ptask, ptask_body_t body)
+int ptask_create(ptask_t *ptask, ptask_body_t *body)
 {
 int err;
 
@@ -250,7 +250,7 @@ int ptask_destroy(ptask_t *ptask)
 }
 
 int ptask_short(ptask_t *ptask,
-	long wcet, int period, int deadline, int priority, ptask_body_t body)
+	long wcet, int period, int deadline, int priority, ptask_body_t *body)
 {
 int err;
 
@@ -268,7 +268,7 @@ int err;
 
 	return err;
 }
--
+
 int ptask_cancel(ptask_t *ptask)
 {
 	if (!_ptask_isjoinable(ptask))

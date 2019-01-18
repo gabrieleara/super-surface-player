@@ -10,8 +10,10 @@ DIR_RES = res
 DIR_OBJ = obj
 DIR_DIS = dist
 DIR_DEP = dep
+DIR_INC = inc
+DIR_API = inc/api
 DIR_TEST= test_files
-DIRECTORIES = $(DIR_OBJ) $(DIR_DIS) $(DIR_DEP) $(DIR_TEST)
+DIRECTORIES = $(DIR_OBJ) $(DIR_DIS) $(DIR_DEP) $(DIR_TEST) $(DIR_INC)
 
 #---------------------------------------------------
 # Files
@@ -20,13 +22,23 @@ DIRECTORIES = $(DIR_OBJ) $(DIR_DIS) $(DIR_DEP) $(DIR_TEST)
 # Global destinaion file
 DEST = $(DIR_DIS)/super
 
-# Object files related to source files
+# Source files
 APIS_SRC = time_utils.c ptask.c
 MODULES_SRC = main.c audio.c video.c
-
 SOURCES = $(APIS_SRC) $(MODULES_SRC)
+
+# Header files
+# APIS_HEADERS = $(addprefix $(DIR_API)/,$(APIS_SRC:.c=.h)) $(DIR_API)/std_emu.h
+# MODULES_HEADERS = $(addprefix $(DIR_INC)/,$(MODULES_SRC:.c=.h))
+# HEADERS = $(APIS_HEADERS) $(MODULES_HEADERS)
+
+# Object files
 OBJECTS = $(addprefix $(DIR_OBJ)/,$(SOURCES:.c=.o))
 
+# Doxygen input file
+DOXYFILE = docs/Doxyfile.in
+
+# Extra option to prevent prints when generating Doxygen
 DOXFLAGS = > /dev/null 2> /dev/null
 
 #---------------------------------------------------
@@ -62,7 +74,7 @@ COMPILE.c += $(INCLUDES)
 MKDIR = mkdir -p
 
 # Doxygen command
-DOXYGEN = doxygen docs/Doxyfile.in
+DOXYGEN = doxygen
 
 #---------------------------------------------------
 # Phony Rules
@@ -97,7 +109,7 @@ compile-debug: $(DEST)
 
 # Generate documentation (by default suppresses any output)
 docs:
-	$(DOXYGEN) $(DOXFLAGS)
+	$(DOXYGEN) $(DOXYFILE) $(DOXFLAGS)
 
 # Generate documentation, but with detailed output
 docs-verbose: DOXFLAGS =

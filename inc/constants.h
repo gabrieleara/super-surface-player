@@ -229,6 +229,7 @@
 // schedulability analysis.
 
 // GUI TASK
+
 #define TASK_GUI_WCET		(WCET_UNKNOWN)
 #define TASK_GUI_PERIOD		(30)	// a little more than 30 fps
 #define TASK_GUI_DEADLINE	(30)	// same as period
@@ -247,14 +248,14 @@
 #define TASK_MIC_WCET		(WCET_UNKNOWN)
 #define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD/10)
 #define TASK_MIC_DEADLINE 	(TASK_MIC_PERIOD)
-#define TASK_MIC_PRIORITY	(3)
+#define TASK_MIC_PRIORITY	(4)
 
 // FFT TASK
 
 #define TASK_FFT_WCET		(WCET_UNKNOWN)
 #define TASK_FFT_PERIOD		(AUDIO_DESIRED_PERIOD / 10)
-#define TASK_FFT_DEADLINE	(TASK_MIC_PERIOD)
-#define TASK_FFT_PRIORITY	(2)
+#define TASK_FFT_DEADLINE	(TASK_FFT_PERIOD)
+#define TASK_FFT_PRIORITY	(3)
 
 // TODO: Define characteristics of each ANALYSIS TASK
 
