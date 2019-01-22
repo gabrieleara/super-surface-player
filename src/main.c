@@ -1,58 +1,78 @@
-#include <stdlib.h>
+/**
+ * @file main.c
+ * @brief Main program public functions and data types
+ *
+ * @author Gabriele Ara
+ * @date 2019/01/17
+ *
+ * The main module is reponsible for the setup of the application (in particular
+ * when executed in text mode) and to manage tasks once the graphical mode is
+ * started.
+ *
+ * For public functions, documentation can be found in corresponding header file:
+ * video.h.
+ *
+ */
+
+// Standard libraries
 #include <stdbool.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
 
+#include <assert.h>			// Used in debug
+
+// Linux-related types
 #include <sys/types.h>
+
+// POSIX directory management functions
 #include <dirent.h>
 
+// Linked libraries
 #include <allegro.h>
 
+// Custom libraries
 #include "api/std_emu.h"
 #include "api/ptask.h"
 
+// Other modules
 #include "constants.h"
-
 #include "main.h"
-#include "video.h"
 #include "audio.h"
+#include "video.h"
 
+// -----------------------------------------------------------------------------
+//                           PRIVATE DATA TYPES
+// -----------------------------------------------------------------------------
 
-/* -----------------------------------------------------------------------------
- * GLOBAL VARIABLES
- * -----------------------------------------------------------------------------
- */
-
-/* -----------------------------------------------------------------------------
- * DATA TYPES
- * -----------------------------------------------------------------------------
- */
-
- // Global state of the program
+/// Structure containing the global state of the program
 typedef struct __MAIN_STRUCT
 {
 	// NOTE: When modifying the main_state_t data structure, consider
 	// which state should be adopted as default state.
 
-	bool			tasks_terminate;// tells if concurrent tasks should stop
-									// their execution
-	bool			quit;			// tells if the program is shutting down
-	bool			verbose;		// tells if the verbose flag has been set
+	bool			tasks_terminate;///< tells if concurrent tasks should stop
+									///< their execution
+	bool			quit;			///< tells if the program is shutting down
+	bool			verbose;		///< tells if the verbose flag has been set
 	char			directory[MAX_DIRECTORY_LENGTH];
-									// the specified directory where to search
-									//for audio files
+									///< the specified directory where to search
+									///< for audio files (also referred as the
+									///< current working directory)
 
-	ptask_t			tasks[TASK_NUM];// all the tasks data
+	ptask_t			tasks[TASK_NUM];///< all the tasks data
 
-	ptask_mutex_t	mutex;			// protects access to this data structure
-	ptask_cond_t	cond;			// used to wake up main thread
+	ptask_mutex_t	mutex;			///< protects access to this data structure
+	ptask_cond_t	cond;			///< used to wake up the main thread when in
+									///< graphical mode
 } main_state_t;
 
-// NOTE: Consider wether global states of each module should be made static or
-// not, and if so implement required getters/setters if not already done.
+// -----------------------------------------------------------------------------
+//                           GLOBAL VARIABLES
+// -----------------------------------------------------------------------------
 
-main_state_t main_state =
+/// The state of the program
+static main_state_t main_state =
 {
 	.tasks_terminate = false,
 	.quit = false,
@@ -60,15 +80,11 @@ main_state_t main_state =
 	.directory = "",
 };
 
-/* -----------------------------------------------------------------------------
- * UTILITY CALLBACKS
- * -----------------------------------------------------------------------------
- */
 
-/*
- * Forcefully closes the program after displaying an error message.
- * Use only as last resource.
- */
+// -----------------------------------------------------------------------------
+//                           PUBLIC FUNCTIONS
+// -----------------------------------------------------------------------------
+
 void abort_on_error(char* message)
 {
 int len;
@@ -76,14 +92,10 @@ int len;
 	if (message)
 		printf("%s\r\n", message);
 
-	/*if (allegro_error)
-	{
-		*/
 	len = strnlen(allegro_error, ALLEGRO_ERROR_SIZE);
 
 	if (len > 0)
 		printf("Last allegro error is %s.\r\n", allegro_error);
-	/*}*/
 
 	// NOTE: A negative error may be due to ALSA library, consider using
 	// snd_strerr to print the error.
@@ -91,17 +103,43 @@ int len;
 	exit(EXIT_FAILURE);
 }
 
-/* -----------------------------------------------------------------------------
- * PRIVATE FUNCTIONS
- * -----------------------------------------------------------------------------
- */
+void main_terminate_tasks()
+{
+	ptask_mutex_lock(&main_state.mutex);
+	main_state.tasks_terminate = true;
+	ptask_cond_signal(&main_state.cond);
+	ptask_mutex_unlock(&main_state.mutex);
+}
 
-/*
+bool main_get_tasks_terminate()
+{
+bool res;
+
+	ptask_mutex_lock(&main_state.mutex);
+	res = main_state.tasks_terminate;
+	ptask_mutex_unlock(&main_state.mutex);
+
+	return res;
+}
+
+
+// -----------------------------------------------------------------------------
+//                           PRIVATE FUNCTIONS
+// -----------------------------------------------------------------------------
+
+/* ----------------------- COMMAND-LINE ARGUMENTS --------------------------- */
+
+/**
+ * @name Command line arguments-related private functions
+ */
+//@{
+
+/**
  * Checks an argument code. If the code is valid and it is the first time it is
  * specified enables that argument and returns zero, otherwise an error code is
  * returned.
  */
-int _check_argument_code(char c)
+int check_argument_code(char c)
 {
 int err = 0;
 
@@ -127,7 +165,10 @@ int err = 0;
 	return err;
 }
 
-bool _is_valid_directory(const char* path)
+/**
+ * Returns true if the given path exists and it is a directory.
+ */
+bool is_valid_directory(const char* path)
 {
 DIR*	directory;		// Directory pointer, used to check if the directory
 						// exists
@@ -143,11 +184,11 @@ DIR*	directory;		// Directory pointer, used to check if the directory
 	return false;
 }
 
-/*
+/**
  * Checks the command line arguments specified by the user.
  * Returns zero on success, an error code otherwise.
  */
-int _read_arguments(int argc, char* argv[])
+int read_arguments(int argc, char* argv[])
 {
 int			err = 0, i, len;
 const char*	str;
@@ -162,20 +203,20 @@ const char*	str;
 			if(strlen(str) != 2)
 				err = EINVAL;
 			else
-				err = _check_argument_code(str[1]);
+				err = check_argument_code(str[1]);
 		}
 		else
 		{
 			// It shall be a directory specification
-
 			len = strlen(str);
 
 			if (strlen(main_state.directory)
 				|| len >= MAX_DIRECTORY_LENGTH-1
-				|| !_is_valid_directory(str))
-
+				|| !is_valid_directory(str))
+			{
 				// Directory was already specified or is invalid
 				err = EINVAL;
+			}
 			else
 			{
 				strncpy(main_state.directory, str, MAX_DIRECTORY_LENGTH);
@@ -192,10 +233,16 @@ const char*	str;
 	return err;
 }
 
+//@}
 
 /* ------------------------- TERMINAL MODE COMMANDS ------------------------- */
 
-/*
+/**
+ * @name Terminal mode commands implementations
+ */
+//@{
+
+/**
  * Displays all available commands in terminal mode.
  */
 void cmd_help()
@@ -208,6 +255,7 @@ void cmd_help()
 	printf(" list\t\tList all the opened audio/midi files.\r\n");
 	printf(" listen\t<fnum>\tListen to the specified audio/midi file.\r\n");
 	printf(" play\t\tTo start playing in windowed mode.\r\n");
+	printf(" pwd\t\tPrint current working directory.\r\n");
 	printf(" open\t<fname>\tTo open a new audio/midi file.\r\n");
 	printf(" quit\t\tTo quit this program.\r\n");
 	printf(" record\t<fnum>\tTo record an audio input that will trigger the file specified by the num.\r\n");
@@ -218,18 +266,30 @@ void cmd_help()
 
 	printf("\r\n");
 
-	if (strlen(main_state.directory))
-	{
-		printf(" \t\tThe specified <fname> shall be an absolute path or a relative path to the directory\r\n \t\tspecified through the command line argument, which is:\r\n");
-		printf("\t\t\t%s\r\n", main_state.directory);
-	}
-	else
-		printf(" \t\tThe specified <fname> shall be an absolute path or a relative path to the current directory.\r\n");
+	printf(" \t\tThe specified <fname> shall be an absolute path or a relative "
+			"path to the\r\n\t\tcurrent working directory.\r\n");
 
 	printf("\r\n");
 }
 
-/*
+/**
+ * Prints the current working directory.
+ */
+void cmd_pwd()
+{
+char cwd[1024];
+
+	printf("Current working dir:");
+	if (strlen(main_state.directory) > 0)
+	{
+		printf("%s\r\n", main_state.directory);
+	} else {
+		getcwd(cwd, sizeof(cwd));
+		printf("%s\r\n", cwd);
+	}
+}
+
+/**
  * Opens an audio input file, being it a sample or a midi it doesn't matter.
  */
 void cmd_open(char* filename)
@@ -266,7 +326,10 @@ int		err = 0;
 		printf("The requested file has been opened.\r\n");
 }
 
-void cmd_play(int fnum)
+/**
+ * Plays an already-opened audio file, given its index in a 1-based list.
+ */
+void cmd_listen(int fnum)
 {
 int err;
 
@@ -276,9 +339,11 @@ int err;
 
 	if (err)
 		printf("The specified file could not be played.\r\n");
-
 }
 
+/**
+ * Closes an already-opened audio file, given its index in a 1-based list.
+ */
 void cmd_close(int fnum)
 {
 int err;
@@ -291,6 +356,12 @@ int err;
 		printf("The specified file could not be closed.\r\n");
 }
 
+/**
+ * Implements the main loop that is executed whenever the program is in text
+ * mode.
+ * In this mode, the user can configure the system before starting the graphic
+ * mode.
+ */
 void terminal_mode()
 {
 char buffer[MAX_CHAR_BUFFER_SIZE];	// Buffer containing the inserted line
@@ -301,6 +372,8 @@ int num_strings;
 int fnum;							// File number optionally specified by the
 									// user
 int err;
+
+	// TODO: document this code much better
 
 	printf("\r\n\r\nTerminal mode enabled.\r\nIn this mode you can edit your opened files.\r\n");
 	printf("Type help for a list of the available commands...\r\n");
@@ -317,9 +390,17 @@ int err;
 			command[0] = '\0';
 
 		if (strcmp(command, "help") == 0)
+		{
 			cmd_help();
+		}
+		else if (strcmp(command, "pwd") == 0)
+		{
+			cmd_pwd();
+		}
 		else if (strcmp(command, "quit") == 0)
+		{
 			main_state.quit = true;
+		}
 		else if (strcmp(command, "open") == 0)
 		{
 			if (num_strings < 2)
@@ -334,7 +415,7 @@ int err;
 			if (err < 1)
 				printf("Invalid command. Missing file number.\r\n");
 			else
-				cmd_play(fnum);
+				cmd_listen(fnum);
 		}
 		else if (strcmp(command, "close") == 0)
 		{
@@ -346,30 +427,41 @@ int err;
 				cmd_close(fnum);
 		}
 		else if (strcmp(command, "list") == 0)
+		{
 			audio_list_files();
+		}
 		else if (strcmp(command, "play") == 0)
+		{
 			start_graphic_mode = true;
+		}
 		else if (strcmp(command, "record") == 0)
+		{
 			; 	// TODO: This command should be used to associate a recording to
 				// an opened file id.
+		}
 		else if(strlen(command) < 1)
-			; // Do nothing
+		{
+			// Empty newline, do nothing
+		}
 		else
+		{
 			printf("Invalid command. Try again.\r\n");
-
+		}
 	}
 }
 
-/* -----------------------------------------------------------------------------
- * TASKS FUNCTIONS
- * -----------------------------------------------------------------------------
- */
+//@}
 
-/*
- * The following functions initialize and start at the same time the relative
- * task.
- */
+/* ------------------------ TASKS HANDLING FUNCTIONS ------------------------ */
 
+/**
+ * @name Tasks handling private functions
+ */
+//@{
+
+/**
+ * Initializes and starts the GUI task, returning zero on success.
+ */
 int start_gui_task()
 {
 	return
@@ -382,6 +474,9 @@ int start_gui_task()
 			gui_task);
 }
 
+/**
+ * Initializes and starts the UI task, returning zero on success.
+ */
 int start_ui_task()
 {
 	return
@@ -394,6 +489,9 @@ int start_ui_task()
 			user_interaction_task);
 }
 
+/**
+ * Initializes and starts the recording task, returning zero on success.
+ */
 int start_microphone_task()
 {
 	return
@@ -407,6 +505,9 @@ int start_microphone_task()
 	//return 0;
 }
 
+/**
+ * Initializes and starts the FFT task, returning zero on success.
+ */
 int start_fft_task()
 {
 	return
@@ -420,6 +521,10 @@ int start_fft_task()
 }
 
 
+/**
+ * Initializes and starts the analyzer task, returning zero on success.
+ * TODO: it may be necessary to start many of these
+ */
 int start_analyzer_task()
 {
 	// TODO: This task should be divided between multiple tasks, one for each
@@ -438,11 +543,11 @@ int start_analyzer_task()
 	return 0;
 }
 
-/*
+/**
  * Aborts the task specified by the id. It is unsafe, since the task will leave
  * all data structures in a dirty condition, so it shall be called only when
  * closing the program if necessary. Also, it assumes that the task is in
- * cancelable state when called.
+ * cancelable state when called, see ptask_cancel().
  */
 void abort_task(int task_id)
 {
@@ -450,11 +555,12 @@ void abort_task(int task_id)
 	ptask_join(&main_state.tasks[task_id]);
 }
 
-/*
+/**
  * Initializes all the concurrent tasks in the system and starts them, one by
- * one.
+ * one. On error, it returns zero and the program should abort to avoid having
+ * zombie tasks.
  */
-int _initialize_tasks()
+int initialize_tasks()
 {
 int err;
 
@@ -473,14 +579,13 @@ int err;
 	if (err) return err;
 
 	err = start_analyzer_task();
-
 	return err;
 }
 
-/*
- * Joins all the active tasks.
+/**
+ * Blocks the thread execution to join all the active tasks.
  */
-void _join_tasks()
+void join_tasks()
 {
 // TODO: Update this function to reflect new tasks organization.
 
@@ -493,27 +598,16 @@ void _join_tasks()
 	ptask_join(&main_state.tasks[TASK_MIC]);
 }
 
+//@}
 
-/* -----------------------------------------------------------------------------
- * PUBLIC FUNCTIONS
- * -----------------------------------------------------------------------------
+/* -------------------------- MAIN THREAD HANDLING -------------------------- */
+
+/**
+ * @name Main thread handling functions
  */
+//@{
 
-/*
- * Sends a signal to the main thread, waiting in the loop, which then will
- * terminate all the other tasks. This shall be called only in graphic mode.
- */
-void main_terminate_tasks()
-{
-	ptask_mutex_lock(&main_state.mutex);
-
-	main_state.tasks_terminate = true;
-	ptask_cond_signal(&main_state.cond);
-
-	ptask_mutex_unlock(&main_state.mutex);
-}
-
-/*
+/**
  * Forever loop for the main thread, until the graphic mode termination is
  * requested.
  */
@@ -527,26 +621,10 @@ void main_wait()
 	ptask_mutex_unlock(&main_state.mutex);
 
 	// Wait for termination of all the tasks
-	_join_tasks();
+	join_tasks();
 }
 
-/*
- * Returns wether tasks should terminate(gracefully) or keep going with their
- * computations.
- */
-bool main_get_tasks_terminate()
-{
-bool ret;
-
-	ptask_mutex_lock(&main_state.mutex);
-	ret = main_state.tasks_terminate;
-	ptask_mutex_unlock(&main_state.mutex);
-
-	return ret;
-}
-
-
-/*
+/**
  * Initializes the program and the Allegro resources needed through all the
  * program life.
  * Returns zero on success, a non zero value otherwise.
@@ -589,24 +667,23 @@ int err;
 	return 0;
 }
 
-
-
-
-
-
+/**
+ * Simply the main of the program.
+ */
 int main(int argc, char* argv[])
 {
 int err;
-char cwd[1024];
-	getcwd(cwd, sizeof(cwd));
-	printf("Current working dir: %s\n", cwd);
 
 	// Read arguments from command line, if any
-	err = _read_arguments(argc, argv);
+	err = read_arguments(argc, argv);
 	if (err)
-		abort_on_error("Specified arguments are invalid or the directory specified does not exist.");
+	{
+		abort_on_error("Specified arguments are invalid or the directory "
+			"specified does not exist.");
+	}
 
-	// Program initialization
+	// Print current working directory on program initialization
+	cmd_pwd();
 
 	printf("Program initialization...\r\n");
 
@@ -624,9 +701,9 @@ char cwd[1024];
 
 			printf("Starting concurrent tasks...\r\n");
 
-			err = _initialize_tasks();
+			err = initialize_tasks();
 			if (err)
-				abort_on_error("Could not initialize tasks");
+				abort_on_error("Could not initialize concurrent tasks.");
 
 			printf("Tasks started, entering the main wait mode...\r\n");
 
@@ -640,3 +717,5 @@ char cwd[1024];
 
 	return EXIT_SUCCESS;
 }
+
+//@}

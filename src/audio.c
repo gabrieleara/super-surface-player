@@ -449,6 +449,7 @@ static inline void timed_wait(int ms)
  * Reads microphone data if available, blocking until the number of frames that
  * is requested is not available yet.
  * TODO: add more to this documentation if the function is actually used.
+ * TODO: actually probably this function will be used while in single-thread text mode.
 */
 /*
 static inline void mic_read_blocking(short* buffer, const int nframes)

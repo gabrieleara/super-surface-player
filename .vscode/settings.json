@@ -26,7 +26,8 @@
         "cstdlib": "c",
         "libgen.h": "c",
         "fftw3.h": "c",
-        "string_view": "c"
+        "string_view": "c",
+        "types.h": "c"
     },
     "files.trimTrailingWhitespace": true,
     "C_Cpp.intelliSenseEngine": "Default",
