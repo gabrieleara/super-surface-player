@@ -13,6 +13,7 @@
 // Standard libraries
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 
 #include <assert.h>			// Used in debug
 
@@ -358,16 +359,101 @@ int num, i;
 }
 
 /**
+ * Converts a value of FFT energy into the height of its plot in pixels.
+ */
+int fft_average_to_height(double average) {
+	average = average/1000;
+
+	if (average > FFT_PLOT_HEIGHT)
+		return FFT_PLOT_HEIGHT;
+
+	return average;
+}
+
+/**
  * Draws the FFT of the (last) recorded audio on the screen.
  */
 static inline void draw_fft()
 {
+int buffer_index;
 double *buffer;
-int rate;
-int frames;
+static double half_buffer[AUDIO_DESIRED_HALFCOMPLEX];
 
-	// TODO: To implement this function, try to find again the code that you
-	// wrote almost two years year ago!
+int rrate;			// acquisition rate
+int rframes;		// number of frames per audio sample
+
+	rrate	= audio_get_rrate();
+	rframes = audio_get_last_fft(&buffer, &buffer_index);
+
+	if (rframes < 1)
+	{
+		// No FFT available yet
+		return;
+	}
+
+	// TODO: check whether it is fixed now
+	int number_frames = AUDIO_FRAMES_TO_HALFCOMPLEX(rframes);
+
+	// Round rframes to be multiple of 2 if it is odd
+	// TODO : check the half-complex structure whether it uses the middle element if odd
+	// rframes = (rframes / 2) * 2;
+
+	// FIXME : Actually the half-complex format uses the first element (index 0)
+	// to store a pure real value, while the n/2 element (only if n is even) is
+	// used to store another pure real value, change this method to reflect that
+	// behavior
+	for (int i = 1; i < number_frames; ++i) {
+		half_buffer[i] = sqrt(
+			buffer[i] * buffer[i] +
+			buffer[rframes-i] * buffer[rframes - i]
+		);
+	}
+
+	audio_free_last_fft(buffer_index);
+
+	rframes = number_frames;
+
+	double frame_window_per_pixel = STATIC_CAST(double,rframes) /
+		STATIC_CAST(double,FFT_PLOT_WIDTH);
+
+	double average;
+	double first_frame = 0.;
+	double last_frame;
+
+	double first_frame_weigth;
+	double last_frame_weigth;
+
+	int first_frame_index;
+	int last_frame_index;
+	int i;
+
+	for (int pixel_offset = 0; pixel_offset < FFT_PLOT_WIDTH; ++pixel_offset) {
+		// NOTE: I can skip the multiplication
+		last_frame = first_frame + frame_window_per_pixel;
+
+		first_frame_weigth = 1 - (ceil(first_frame) - first_frame);
+		double last_frame_weigth = last_frame - floor(first_frame);
+
+		first_frame_index = STATIC_CAST(int, floor(first_frame));
+		last_frame_index = STATIC_CAST(int, ceil(last_frame));
+
+		average = first_frame_weigth * half_buffer[first_frame_index];
+		for (i = first_frame_index+1; i < last_frame_index; ++i) {
+			average += half_buffer[i]; // weigth is one inside
+		}
+		average += last_frame_weigth * half_buffer[last_frame_index];
+		average /= frame_window_per_pixel;
+		average = fft_average_to_height(average);
+
+		rectfill(gui_state.virtual_screen,
+				 FFT_PLOT_X		+ pixel_offset,
+				 FFT_PLOT_MY	- average - 1,
+				 FFT_PLOT_X		+ pixel_offset + 1,
+				 FFT_PLOT_MY	- 1,
+				 COLOR_ACCENT);
+
+		first_frame = last_frame;
+	}
 }
 
 /**
@@ -478,9 +564,9 @@ int amplitude;			// The height of the most recent computed amplitude
 	// TIME_SPEED pixels and the height depends linearly on the amplitude, as
 	// computed above.
 	rectfill(gui_state.virtual_screen,
-			 TIME_PLOT_MX - TIME_SPEED,
+			 TIME_PLOT_MX - TIME_SPEED - 1,
 			 TIME_PLOT_MY - amplitude - 1,
-			 TIME_PLOT_MX - 1,
+			 TIME_PLOT_MX - 2,
 			 TIME_PLOT_MY - 1,
 			 COLOR_ACCENT);
 

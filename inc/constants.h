@@ -29,6 +29,19 @@
 										///< NOTICE: that the bigger this is,
 										///< the bigger the latency of the system
 
+#define AUDIO_FRAMES_TO_HALFCOMPLEX(frames) ((frames + 1) / 2 - 1)
+										///< Converts the number of acquired
+										///< frames to the number of values of
+										///< the corresponding magnitude-only
+										///< half-complex FFT.
+										///< See FFTW documentation for further
+										///< details.
+
+#define AUDIO_DESIRED_HALFCOMPLEX	AUDIO_FRAMES_TO_HALFCOMPLEX(AUDIO_DESIRED_FRAMES)
+										///< Desired dimension of the
+										///< magnitude-only half-complex FFT
+										///< buffer.
+
 #define AUDIO_NUM_BUFFERS		10
 										///< Number of buffers related to audio
 										///< acquisition
@@ -187,11 +200,20 @@
 	dimensions specified here are the borders of the graph.
 */
 
+// FIXME: change the horrible "graph" word
 #define FFT_P		(PADDING * 2)			///< fft graph padding
 #define FFT_X		(0 + FFT_P)				///< fft graph position x
 #define FFT_Y		(0 + FFT_P)				///< fft graph position y
 #define FFT_MX		(SIDE_X - FFT_P)		///< fft graph max x
 #define FFT_MY		(FOOTER_Y/2 - FFT_P)	///< fft graph max y
+
+#define FFT_PLOT_X		(FFT_X + FFT_P)
+#define FFT_PLOT_Y		(FFT_Y + FFT_P)
+#define FFT_PLOT_MX		(FFT_MX - FFT_P)
+#define FFT_PLOT_MY		(FFT_MY - FFT_P)
+
+#define FFT_PLOT_WIDTH	(FFT_PLOT_MX - FFT_PLOT_X - 1)
+#define FFT_PLOT_HEIGHT	(FFT_PLOT_MY - FFT_PLOT_Y)
 
 /*
 	 __________________________________________________________
@@ -227,7 +249,7 @@
 #define TIME_PLOT_MX	(TIME_MX - TIME_P)
 #define TIME_PLOT_MY	(TIME_MY - TIME_P)
 
-#define TIME_PLOT_WIDTH		(TIME_PLOT_MX - TIME_PLOT_X)	///< time plot width
+#define TIME_PLOT_WIDTH		(TIME_PLOT_MX - TIME_PLOT_X - 1)///< time plot width
 #define TIME_PLOT_HEIGHT	(TIME_PLOT_MY - TIME_PLOT_Y)	///< time plot height
 
 #define TIME_SPEED			(1)		///< The speed at which the time plot moves
