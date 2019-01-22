@@ -35,6 +35,7 @@
 // -----------------------------------------------------------------------------
 
 #define BITMAP_RES_FOLDER		"res/"	///< Folder in which bitmaps are placed
+
 #define BITMAP_BACKGROUND_PATH	BITMAP_RES_FOLDER "background.bmp"
 										///< Background bitmap relative path
 #define BITMAP_S_ELEMENT_PATH	BITMAP_RES_FOLDER "element.bmp"
@@ -42,9 +43,59 @@
 #define BITMAP_M_ELEMENT_PATH	BITMAP_RES_FOLDER "element_midi.bmp"
 										///< MIDI-based audio entry bitmap relative path
 
-#define STR_VOLUME				"Volume"			///< Volume control string
-#define STR_PANNING				"Panning"			///< Panning control string
-#define STR_FREQUENCY			"Base Frequency"	///< Frequency adjustment control string
+#define STR_VOLUME		"Volume"			///< Volume control string
+#define STR_PANNING		"Panning"			///< Panning control string
+#define STR_FREQUENCY	"Base Frequency"	///< Frequency adjustment control string
+
+#define MOUSE_DELAY_LONG	(300)
+									///< A longer delay between the first mouse
+									///< click event and subsequent ones (ms)
+#define MOUSE_DELAY_SHORT	(15)
+									///< A shorter delay between two mouse
+									///< click events (ms)
+
+#define MAX_KEY_COMMANDS	(256)
+									///< The maximum number of keyboard commands
+									///< that can be handled in a single iteration
+
+
+// -----------------------------------------------------------------------------
+//                             PRIVATE MACROS
+// -----------------------------------------------------------------------------
+
+/**
+ * Returns whether a mouse button is pressed or not. Call this with the
+ * `mouse_b` variable to check if a button is pressed.
+ *
+ * From Allegro documentation:
+ * > The `mouse_b` variable is a bitfield indicating the state of each button:
+ * >  - bit 0 is the left button,
+ * >  - bit 1 the right, and
+ * >  - bit 2 the middle button.
+ * >
+ * > Additional non standard mouse buttons might be available as higher bits in
+ * > this variable.
+ *
+ */
+#define MOUSE_BUTTON(mouse, button) (mouse & (1 << button))
+/// Returns whether the left button is pressed. See MOUSE_BUTTON().
+#define MOUSE_BUTTON_LEFT(mouse) MOUSE_BUTTON(mouse, 0)
+/// Returns whether the right button is pressed. See MOUSE_BUTTON().
+#define MOUSE_BUTTON_RIGHT(mouse) MOUSE_BUTTON(mouse, 1)
+/// Returns whether the middle button is pressed. See MOUSE_BUTTON().
+#define MOUSE_BUTTON_MIDDLE(mouse) MOUSE_BUTTON(mouse, 2)
+
+/**
+ * Returns the mouse X position. Call this with the `mouse_pos` variable to get
+ * its X position.
+ *
+ * From Allegro documentation:
+ * > The `mouse_pos` variable has the current X coordinate in the upper 16 bits
+ * > and the Y coordinate on the lower 16 ones.
+ */
+#define MOUSE_POS_TO_X(pos) (pos >> 16)
+/// Returns the mouse Y position. See MOUSE_POS_TO_X() for futher details.
+#define MOUSE_POS_TO_Y(pos) (pos & 0x0000FFFF)
 
 
 // -----------------------------------------------------------------------------
@@ -271,7 +322,6 @@ int posx, posy;	// Starting point where to draw the given element
 		COLOR_TEXT_PRIM, COLOR_BKG);
 }
 
-
 /**
  * Draws the given index element.
  */
@@ -385,14 +435,15 @@ int res;
  */
 static inline void draw_amplitude()
 {
-// TODO: Consider changing the organization of this function and to adopt more
-// global variables/constants
+static BITMAP *amplitude_bitmap = NULL;	// Static object used to store the
+										// previous plot, so that it can be
+										// later re-plotted on the next
+										// execution shifted by TIME_SPEED
+										// pixels
 
-// TODO: documentation
-static BITMAP *amplitude_bitmap = NULL;
+int amplitude;			// The height of the most recent computed amplitude
 
-int amplitude;
-
+	// Static initialization on first run
 	if (amplitude_bitmap == NULL)
 	{
 		// On first execution, a new bitmap is created, with the same content of
@@ -435,8 +486,8 @@ int amplitude;
 
 	// Shift the plot on the virtual screen for next execution.
 	// NOTICE: we can't use the virtual screen itself because it's cleared at
-	// each execution.
-	// TODO: check whether this statement is true.
+	// each execution, every time we refresh the screen the background is
+	// printed on the whole virtual screen.
 	blit(gui_state.virtual_screen, amplitude_bitmap,
 		 TIME_PLOT_X,
 		 TIME_PLOT_Y,
@@ -499,9 +550,6 @@ static inline void close_button_proc()
 	// Request the main module to terminate current session
 	main_terminate_tasks();
 }
-
-// TODO: move somewhere else
-#define MAX_KEY_COMMANDS	256
 
 /**
  * Handles actions that are triggered by numeric keys.
@@ -673,62 +721,79 @@ static inline void handle_click(int button_id, int element_id)
  */
 static inline void handle_mouse_input()
 {
-int		pos, x, y, elem_id;
-bool	pressed;
+int		pos,						// The copy of the mouse position
+		x,							// The X mouse position
+		y,							// The Y mouse position
+		elem_id;					// The element in which the mouse is in, if
+									// it is inside an element of the side panel
 
-static button_id_t button_hover;
-static button_id_t button_hover_past = -1;
+bool	pressed;					// Whether the left button is pressed
 
-static bool pressed_past = false;
+static button_id_t button_hover;	// The id of the button on which the mouse
+									// is over
+
+static button_id_t button_hover_past = BUTTON_INVALID;
+									// The id of the button on which the mouse
+									// wss over at the previous iteration
+
+static bool pressed_past = false;	// Whether the left button was pressed in
+									// the previous iteration
 
 static struct timespec next_click_time;
-static struct timespec current_time;
+									// The time at which another click action is
+									// accepted
+static struct timespec current_time;// The current time at this iteration
 
 	if(poll_mouse() || !mouse_on_screen()) return;	// No mouse driver installed
 													// or mouse is not on screen
 
+	// Position is first copied to a local variable to prevent concurrency errors
+	// NOTE: actually this is not necessary since we told Allegro to work with
+	// the mouse in polling mode! However, the Allegro documentation states that
+	// this is the preferred way for polling, so we'll stick with that.
 	pos		= mouse_pos;
-	pressed	= mouse_b & 1;
+	pressed	= MOUSE_BUTTON_LEFT(mouse_b);
 
-	// TODO: Move these operations to a macro.
-	x = pos >> 16;
-	y = pos & 0x0000FFFF;
+	x = MOUSE_POS_TO_X(pos);
+	y = MOUSE_POS_TO_Y(pos);
 
 	button_hover	= get_button_id(x, y);
 	elem_id			= get_element_id(x, y);
 
-	if (button_hover == BUTTON_INVALID)
+	if (elem_id == -1)
+	{
+		// Do nothing
+	}
+	else if (button_hover == BUTTON_INVALID)
 	{
 		// Do nothing
 	}
 	else if (button_hover != button_hover_past)
 	{
 		// On a different position, a button event is valid only if it is a
-		// click, if long press/drag then the previous value should be equal to
+		// click, if long press/drag then the previous button state is equal to
 		// the current one and the event will be ignored.
 		if (pressed && !pressed_past)
 		{
-#define MOUSE_DELAY_LONG	(500)
-#define MOUSE_DELAY_SHORT	(15)
 			handle_click(button_hover, elem_id);
 			clock_gettime(CLOCK_MONOTONIC, &next_click_time);
 			time_add_ms(&next_click_time, MOUSE_DELAY_LONG);
-									// TODO: Move this value to a global constant.
 		}
 	} else
 	{
 		// On the same position we can do a different action wether the event
-		// is a simple click or it is a long press. If it is a long press then
-		// after an initial delay we will handle each mouse event as a new event
-		// frequently. The first time the delay is bigger, following times the
+		// is a simple click or it is a long press. If it is a long press, then
+		// after an initial longer delay we will handle each mouse event as a
+		// new event more frequently.
+		// The first time the delay is bigger, following times the
 		// delay is much smaller, basically like the original Tetris game.
 		if (pressed && !pressed_past)
 		{
-			// First click is handled
+			// First click is handled, we also reset the timer for further click
+			// events
 			handle_click(button_hover, elem_id);
 			clock_gettime(CLOCK_MONOTONIC, &next_click_time);
 			time_add_ms(&next_click_time, MOUSE_DELAY_LONG);
-									// TODO: Consider writing an inline function to do this job.
 		} else if (pressed && pressed_past)
 		{
 			// On the same potion, if long press then timers come into game
@@ -745,8 +810,41 @@ static struct timespec current_time;
 		}
 	}
 
-	pressed_past = pressed;
-	button_hover_past = button_hover;
+	pressed_past		= pressed;
+	button_hover_past	= button_hover;
+}
+
+/**
+ * Initializes the graphic mode by creating a new window.
+ */
+int gui_graphic_mode_init()
+{
+int err;
+
+	err = set_gfx_mode(GFX_AUTODETECT_WINDOWED, WIN_MX, WIN_MY, 0, 0);
+	if(err) return err;
+
+	set_close_button_callback(close_button_proc);
+
+	err = static_interface_init();
+
+	return err;
+}
+
+/**
+ * Destroys the window.
+ */
+void gui_graphic_mode_exit()
+{
+#ifndef NDEBUG
+int err;
+	// In debug mode, I assert that everything goes well.
+	err = set_gfx_mode(GFX_TEXT, 0, 0, 0, 0);
+	assert(err == 0);
+#else
+	// In release mode, no check is made
+	set_gfx_mode(GFX_TEXT, 0, 0, 0, 0);
+#endif
 }
 
 //@}
@@ -766,35 +864,6 @@ int err;
 
 	return err;
 }
-
-// NOTE: Some of these functions may be moved to private part.
-
-int gui_graphic_mode_init()
-{
-int err;
-
-	err = set_gfx_mode(GFX_AUTODETECT_WINDOWED, WIN_MX, WIN_MY, 0, 0);
-	if(err) return err;
-
-	set_close_button_callback(close_button_proc);
-
-	err = static_interface_init();
-
-	return err;
-}
-
-void gui_graphic_mode_exit()
-{
-#ifndef NDEBUG
-int err;
-	// In debug mode, I assert that everything goes well.
-	err = set_gfx_mode(GFX_TEXT, 0, 0, 0, 0);
-	assert(err == 0);
-#else
-	set_gfx_mode(GFX_TEXT, 0, 0, 0, 0);
-#endif
-}
-
 
 // -----------------------------------------------------------------------------
 //                                  TASKS
@@ -817,7 +886,7 @@ int err;
 	if (err)
 		abort_on_error("Could not initialize graphic mode.");
 
-	// FIXME: Clear virtual screen content!
+	draw_background();
 
 	ptask_start_period(tp);
 

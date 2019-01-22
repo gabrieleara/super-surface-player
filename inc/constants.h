@@ -11,16 +11,17 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
-//-------------------------------------------------------------
-// GLOBAL SHARED CONSTANTS
-//-------------------------------------------------------------
+// -----------------------------------------------------------------------------
+//                         GLOBAL SHARED CONSTANTS
+// -----------------------------------------------------------------------------
 
 #define MAX_CHAR_BUFFER_SIZE	256		///< Size of any char buffer used in the system
 #define MAX_DIRECTORY_LENGTH	256		///< Maximum length of a directory name
 
-//-------------------------------------------------------------
-// RECORDING CONSTANTS
-//-------------------------------------------------------------
+// -----------------------------------------------------------------------------
+//                           RECORDING CONSTANTS
+// -----------------------------------------------------------------------------
+
 #define AUDIO_DESIRED_RATE		44100	///< Desired acquisition rate (Hz)
 
 #define AUDIO_DESIRED_FRAMES	4096
@@ -43,15 +44,15 @@
 
 // TODO: Add dimensions of buffers used for data analysis
 
-//-------------------------------------------------------------
-// GRAPHIC CONSTANTS
-//-------------------------------------------------------------
+// -----------------------------------------------------------------------------
+//                           GRAPHIC CONSTANTS
+// -----------------------------------------------------------------------------
 
 //-------------------------------------------------------------
-// COLORS
+// Colors
 //-------------------------------------------------------------
 
-#define COLOR_MODE	(32)			///< default color mode
+#define COLOR_MODE		(32)		///< default color mode
 
 #define COLOR_WHITE		(0xFFFFFF)	///< white
 #define COLOR_BKG		(0xF0F0F0)	///< light gray background
@@ -214,7 +215,7 @@
 	dimensions specified here are the borders of the plot.
 */
 
-// TODO: chanhe comments
+// TODO: change comments
 #define TIME_P	(PADDING*2)				///< time plot padding
 #define TIME_X	(0)						///< time plot position x
 #define TIME_Y	(FOOTER_Y/2 + TIME_P)	///< time plot position y
