@@ -10,7 +10,7 @@
     ],
     "editor.wordWrap": "on",
     "editor.wrappingIndent": "indent",
-    "editor.fontLigatures": true, // TODO: check if okay or not okay.
+    "editor.fontLigatures": true,
     "editor.renderIndentGuides": true,
     "files.autoSave": "afterDelay",
     "files.autoSaveDelay": 60000,
@@ -31,5 +31,45 @@
     },
     "files.trimTrailingWhitespace": true,
     "C_Cpp.intelliSenseEngine": "Default",
-    "explorer.sortOrder": "type"
+    "explorer.sortOrder": "type",
+    "todohighlight.keywords": [
+        {
+            "text": "FIXME:",
+            "color": "white",
+            "backgroundColor": "brown",
+            "fontStyle": "normal",
+        },
+        {
+            "text": "TODO:",
+            "color": "white",
+            "backgroundColor": "darkorange",
+            "fontStyle": "normal",
+        },
+        {
+            "text": "HACK:",
+            "color": "white",
+            "backgroundColor": "black",
+            "fontStyle": "normal",
+        },
+        {
+            "text": "IDEA:",
+            "color": "white",
+            "backgroundColor": "deeppink",
+            "fontStyle": "normal",
+        },
+        {
+            "text": "NOTE:",
+            "color": "white",
+            "backgroundColor": "green",
+            "fontStyle": "normal",
+        },
+    ],
+    "todo.colors.types" :
+    {
+        "FIXME": "brown",
+        "TODO": "darkorange",
+        "HACK": "black",
+        "IDEA": "deeppink",
+        "NOTE": "green",
+    },
 }
