@@ -318,7 +318,7 @@ void *cab_pointers[AUDIO_NUM_BUFFERS];
 								// Pointers to buffers used in cab library
 
 	// Allegro sound initialization
-	// NOTE: MIDI files do not work, consider enabling MIDI_AUTODETECT and
+	// FIXME: MIDI files do not work, consider enabling MIDI_AUTODETECT and
 	// implement MIDI files support
 	err = install_sound(DIGI_AUTODETECT, MIDI_NONE, NULL);
 	if (err) return err;
@@ -967,7 +967,7 @@ int err;
 		NULL);
 
 	if (err)
-		return -EINVAL;
+		return -EAGAIN;
 
 	return audio_state.record.rframes;
 }
@@ -977,7 +977,7 @@ void audio_free_last_record(int buffer_index)
 	ptask_cab_unget(&audio_state.record.cab, buffer_index);
 }
 
-int audio_get_last_fft(short *buffer_ptr[], int *buffer_index_ptr)
+int audio_get_last_fft(double *buffer_ptr[], int *buffer_index_ptr)
 {
 	int err;
 
@@ -987,7 +987,7 @@ int audio_get_last_fft(short *buffer_ptr[], int *buffer_index_ptr)
 						   NULL);
 
 	if (err)
-		return -EINVAL;
+		return -EAGAIN;
 
 	return audio_state.fft.rframes;
 }
@@ -995,6 +995,14 @@ int audio_get_last_fft(short *buffer_ptr[], int *buffer_index_ptr)
 void audio_free_last_fft(int buffer_index)
 {
 	ptask_cab_unget(&audio_state.fft.cab, buffer_index);
+}
+
+int audio_get_rrate() {
+	return audio_state.fft.rrate;
+}
+
+int audio_get_rframes() {
+	return audio_state.fft.rframes;
 }
 
 // -----------------------------------------------------------------------------
@@ -1040,9 +1048,9 @@ int		missing;		// How many frames are missing
 	while (!main_get_tasks_terminate())
 	{
 		// While there is new data, keep capturing.
-		// NOTE: This is NOT an infinite loop, because the code is many more
-		// times faster than I/O, if this is a problem, change with an maximum
-		// time limit
+		// NOTICE: This is NOT an infinite loop, because the code is many times
+		// faster than I/O.
+		// NOTE: Change with an maximum time limit if this is a problem.
 		while ((err = mic_read(buffer + how_many_read, missing)) > 0) {
 			how_many_read	+= err;
 			missing			-= err;
@@ -1050,6 +1058,7 @@ int		missing;		// How many frames are missing
 			if (missing == 0)
 			{
 				// Update most recent acquisition and request a new CAB
+
 				// Release CAB to apply changes, a timestamp will be added to
 				// the new data
 				ptask_cab_putmes(&audio_state.record.cab, buffer_index);
@@ -1076,7 +1085,8 @@ int		missing;		// How many frames are missing
 	ptask_cab_unget(&audio_state.record.cab, buffer_index);
 
 	// The reset can be done here because the only task that reserves buffers
-	// for writing purposes is this one
+	// for writing purposes is this one. If other threads are using buffers for
+	// reading purposes, eventually they will unget them.
 	ptask_cab_reset(&audio_state.record.cab);
 
 	return NULL;
@@ -1137,6 +1147,10 @@ unsigned int i;			// Index used to copy data
 			// Calculate in-place FFT using the plan computed above on
 			// current buffer
 			fftw_execute_r2r(audio_state.fft.plan, out_buffer, out_buffer);
+
+			// NOTE: Output of previous FFT is an halfcomplex notation of the
+			// FFT, it should be changed to a full array of magniutes to be
+			// printed.
 
 			// Publish new FFT
 			ptask_cab_putmes(&audio_state.fft.cab, out_buffer_index);

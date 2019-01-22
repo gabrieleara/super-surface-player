@@ -168,8 +168,6 @@ extern void audio_frequency_down(int i);
 /**
  * Fetches the most recent buffer acquired by the microphone using the CAB.
  * Returns its dimension or -EAGAIN if no data is available.
- * TODO: actually it returns either the dimension or -EINVAL when the reserve
- * fails. Check this behavior.
  */
 extern int audio_get_last_record(short *buffer_ptr[], int *buffer_index_ptr);
 
@@ -181,15 +179,23 @@ extern void audio_free_last_record(int buffer_index);
 /**
  * Fetches the most recent buffer produced by FFT task using the CAB.
  * Returns its dimension or -EAGAIN if no data is available.
- * TODO: actually it returns either the dimension or -EINVAL when the reserve
- * fails. Check this behavior.
  */
-extern int audio_get_last_fft(short *buffer_ptr[], int *buffer_index_ptr);
+extern int audio_get_last_fft(double *buffer_ptr[], int *buffer_index_ptr);
 
 /**
  * Frees a previously acquired fft buffer.
  */
 extern void audio_free_last_fft(int buffer_index);
+
+/**
+ * Returns the real acquisition rate of the recorder.
+ */
+extern int audio_get_rrate();
+
+/**
+ * Returns the number of frames captured by the recorder for each sample.
+ */
+extern int audio_get_rframes();
 
 //@}
 
