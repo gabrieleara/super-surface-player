@@ -46,7 +46,6 @@ DOXFLAGS = > /dev/null 2> /dev/null
 #---------------------------------------------------
 
 # Phony tagets are always executed
-# IDEA: The help command should print what are the accepted make commands
 .PHONY: main directories compile clean clean-dep debug compile-release compile-debug super help docs docs-verbose
 
 # Compiler
@@ -82,6 +81,30 @@ DOXYGEN = doxygen
 
 # Default make command
 main: directories compile-release docs super
+
+# Prints all accepted targets
+help:
+	@echo "Following is the list of all accepted targets from command line."
+	@echo ""
+	@echo "\tmain\t\tdefault command, equivalent to \`directories compile-release docs super\`"
+	@echo ""
+	@echo "\tclean\t\tclears the build tree"
+	@echo "\tclean-dep\tcleans all the files in the dep folder"
+	@echo "\tcompile-debug\tcompiles the program in debug mode"
+	@echo "\tcompile-release\tcompiles the program in release mode"
+	@echo ""
+	@echo "\tdebug\t\tbuild in debug mode, equivalent to \`directories compile-debug\`"
+	@echo "\t\t\tIt is preferred to call clean before."
+	@echo ""
+	@echo "\tdirectories \tcreates all directories needed to build the program"
+	@echo "\tdocs\t\tgenerates doxygen documentation"
+	@echo "\tdocs-verbose\tlike \`docs\`, but printing all doxygen information"
+	@echo "\thelp\t\tprints this message"
+	@echo ""
+	@echo "\tsuper\t\tsets the owner of the compiled program as root and it sets also its"
+	@echo "\t\t\tSUID bit, to use real-time scheduling even when running as normal user"
+	@echo ""
+	@echo "Other targets may be defined for internal use only."
 
 # Default compilation command
 # NOTICE: in this case resources are always copied from res to distribution folder
