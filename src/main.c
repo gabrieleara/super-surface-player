@@ -145,7 +145,7 @@ int err = 0;
 
 	switch (c)
 	{
-	// NOTE: even if it is implemented, the verbose command does actually nothing
+	// NOTE: Even if it is implemented, the verbose command does actually nothing
 	case 'v':
 		if(main_state.verbose)
 			err = EINVAL;
@@ -209,10 +209,10 @@ int			begin = 0;					// The index from which we will copy the
 	getcwd(cwd, sizeof(cwd));
 	cwdlen = strlen(cwd);
 
-	// NOTE: I know that for very very long paths it may get outside the array,
-	// it is just very unlikely that a path is over 255 charactrers long. On
-	// FAT, EXT4 systems it is even impossible, thus we will assume it
-	// impossible for the sake of simplicity.
+	// NOTICE: I know that for very very long paths it may get outside the array,
+	// it is just very unlikely that a path is over 255 characters long.
+	// On FAT or EXT4 systems it is even impossible, thus we will assume it is
+	// always impossible for the sake of simplicity.
 
 	// Last character must be a slash
 	if (cwd[cwdlen-1] != '/') {
@@ -411,28 +411,32 @@ char buffer[MAX_CHAR_BUFFER_SIZE];	// Buffer containing the inserted line
 char command[MAX_CHAR_BUFFER_SIZE];	// Parsed command
 char argument[MAX_CHAR_BUFFER_SIZE];// Parsed optional argument
 bool start_graphic_mode = false;	// Used to exit this mode
-int num_strings;
+int num_strings;					// The number of strings that have been
+									// inserted by the user
 int fnum;							// File number optionally specified by the
 									// user
 int err;
 
-	// TODO: document this code much better
+	printf("\r\n\r\nTerminal mode enabled.\r\n"
+		"In this mode you can edit your opened files.\r\n"
+		"Type help for a list of the available commands...\r\n");
 
-	printf("\r\n\r\nTerminal mode enabled.\r\nIn this mode you can edit your opened files.\r\n");
-	printf("Type help for a list of the available commands...\r\n");
-
+	// While the program should keep running in terminal mode
 	while(!main_state.quit && !start_graphic_mode)
 	{
+		// Print prompt
 		printf("\r\n:");
 
+		// Block reading a whole line
 		fgets(buffer, sizeof(buffer), stdin);
 
 		num_strings = sscanf(buffer, "%s %s", command, argument);
 
-		if (num_strings < 1)
-			command[0] = '\0';
-
-		if (strcmp(command, "help") == 0)
+		if (num_strings < 1 || strlen(command) < 1)
+		{
+			// Empty line, do nothing, start loop again
+		}
+		else if (strcmp(command, "help") == 0)
 		{
 			cmd_help();
 		}
@@ -442,6 +446,7 @@ int err;
 		}
 		else if (strcmp(command, "quit") == 0)
 		{
+			// Requested program termination, this will break the loop
 			main_state.quit = true;
 		}
 		else if (strcmp(command, "open") == 0)
@@ -453,6 +458,7 @@ int err;
 		}
 		else if (strcmp(command, "listen") == 0)
 		{
+			// Convert second argument to a number
 			err = sscanf(argument, "%d", &fnum);
 
 			if (err < 1)
@@ -462,6 +468,7 @@ int err;
 		}
 		else if (strcmp(command, "close") == 0)
 		{
+			// Convert second argument to a number
 			err = sscanf(argument, "%d", &fnum);
 
 			if (err < 1)
@@ -475,16 +482,14 @@ int err;
 		}
 		else if (strcmp(command, "play") == 0)
 		{
+			// Requested switch from terminal to gtraphic mode. This will break
+			// the loop.
 			start_graphic_mode = true;
 		}
 		else if (strcmp(command, "record") == 0)
 		{
-				// TODO: This command should be used to associate a recording to
-				// an opened file id.
-		}
-		else if(strlen(command) < 1)
-		{
-			// Empty newline, do nothing
+			// TODO: This command should be used to associate a recording to
+			// an opened file id.
 		}
 		else
 		{

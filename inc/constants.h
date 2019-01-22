@@ -230,8 +230,6 @@
 #define TIME_PLOT_WIDTH		(TIME_PLOT_MX - TIME_PLOT_X)	///< time plot width
 #define TIME_PLOT_HEIGHT	(TIME_PLOT_MY - TIME_PLOT_Y)	///< time plot height
 
-// TODO: change TIME_MAX_HEIGHT macro to something much more readable please
-
 #define TIME_SPEED			(1)		///< The speed at which the time plot moves
 #define TIME_MAX_HEIGHT		((TIME_PLOT_HEIGHT - 1 - (2 * TIME_P)))
 									///< The maximum height of the time plot content
