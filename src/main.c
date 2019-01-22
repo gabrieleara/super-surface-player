@@ -139,12 +139,13 @@ bool res;
  * specified enables that argument and returns zero, otherwise an error code is
  * returned.
  */
-int check_argument_code(char c)
+static inline int check_argument_code(char c)
 {
 int err = 0;
 
 	switch (c)
 	{
+	// NOTE: even if it is implemented, the verbose command does actually nothing
 	case 'v':
 		if(main_state.verbose)
 			err = EINVAL;
@@ -168,7 +169,7 @@ int err = 0;
 /**
  * Returns true if the given path exists and it is a directory.
  */
-bool is_valid_directory(const char* path)
+static inline bool is_valid_directory(const char* path)
 {
 DIR*	directory;		// Directory pointer, used to check if the directory
 						// exists
@@ -188,18 +189,55 @@ DIR*	directory;		// Directory pointer, used to check if the directory
  * Checks the command line arguments specified by the user.
  * Returns zero on success, an error code otherwise.
  */
-int read_arguments(int argc, char* argv[])
+static inline int read_arguments(int argc, char* argv[])
 {
 int			err = 0, i, len;
 const char*	str;
 
+int			cwdlen;
+char 		cwd[MAX_CHAR_BUFFER_SIZE];	// It will contain the current directory
+										// from which the program has been started.
+bool		directory_already_specified = false;
+										// If false we won't accept any other
+										// directory specification in the
+										// command line arguments
+
+int			begin = 0;					// The index from which we will copy the
+										// given directory in the main_state.directory
+
+	// Get the directory in which the program has been launched
+	getcwd(cwd, sizeof(cwd));
+	cwdlen = strlen(cwd);
+
+	// NOTE: I know that for very very long paths it may get outside the array,
+	// it is just very unlikely that a path is over 255 charactrers long. On
+	// FAT, EXT4 systems it is even impossible, thus we will assume it
+	// impossible for the sake of simplicity.
+
+	// Last character must be a slash
+	if (cwd[cwdlen-1] != '/') {
+		cwd[cwdlen] = '/';
+		cwd[cwdlen+1] = '\0';
+		++cwdlen;
+	}
+
+	// Copy the cwd in the current directory, as a base for the optional extra
+	// path given as command argument
+	strcpy(main_state.directory, cwd);
+
+	// The path optionally given as argument will be appended to the cwd if it
+	// is not an absolute path.
+	begin = cwdlen;
+
+	// Iterate all command line arguments
 	for (i = 1; i < argc && !err; ++i)
 	{
+		// Get current argument
 		str = argv[i];
+
 		if(str[0] == '-')
 		{
-			// It shall be a command line code specifier
-
+			// It shall be a command line code specifier (minus sign + a character)
 			if(strlen(str) != 2)
 				err = EINVAL;
 			else
@@ -210,7 +248,7 @@ const char*	str;
 			// It shall be a directory specification
 			len = strlen(str);
 
-			if (strlen(main_state.directory)
+			if (directory_already_specified
 				|| len >= MAX_DIRECTORY_LENGTH-1
 				|| !is_valid_directory(str))
 			{
@@ -219,8 +257,14 @@ const char*	str;
 			}
 			else
 			{
-				strncpy(main_state.directory, str, MAX_DIRECTORY_LENGTH);
+				if (str[0] == '/') {
+					begin = 0;
+				}
 
+				strncpy(main_state.directory + begin, str, MAX_DIRECTORY_LENGTH);
+				len += begin;
+
+				// Last character must be a slash
 				if(main_state.directory[len-1] != '/')
 				{
 					main_state.directory[len] = '/';
@@ -245,7 +289,7 @@ const char*	str;
 /**
  * Displays all available commands in terminal mode.
  */
-void cmd_help()
+static inline void cmd_help()
 {
 	printf("\r\n");
 	printf("Available commands and their effects:\r\n\r\n");
@@ -275,24 +319,15 @@ void cmd_help()
 /**
  * Prints the current working directory.
  */
-void cmd_pwd()
+static inline void cmd_pwd()
 {
-char cwd[1024];
-
-	printf("Current working dir:");
-	if (strlen(main_state.directory) > 0)
-	{
-		printf("%s\r\n", main_state.directory);
-	} else {
-		getcwd(cwd, sizeof(cwd));
-		printf("%s\r\n", cwd);
-	}
+	printf("Current working dir: %s\r\n", main_state.directory);
 }
 
 /**
  * Opens an audio input file, being it a sample or a midi it doesn't matter.
  */
-void cmd_open(char* filename)
+static inline void cmd_open(char* filename)
 {
 char	buffer[MAX_CHAR_BUFFER_SIZE];
 int		err = 0;
@@ -303,8 +338,10 @@ int		err = 0;
 		strncat(buffer, filename, sizeof(buffer));
 	}
 	else
+	{
 		// Absolute path
-		strcpy(buffer, filename);
+		strncpy(buffer, filename, sizeof(buffer));
+	}
 
 	err = audio_open_file(buffer);
 
@@ -323,13 +360,15 @@ int		err = 0;
 		}
 	}
 	else
+	{
 		printf("The requested file has been opened.\r\n");
+	}
 }
 
 /**
  * Plays an already-opened audio file, given its index in a 1-based list.
  */
-void cmd_listen(int fnum)
+static inline void cmd_listen(int fnum)
 {
 int err;
 
@@ -338,13 +377,15 @@ int err;
 	err = audio_play_file(fnum-1);
 
 	if (err)
+	{
 		printf("The specified file could not be played.\r\n");
+	}
 }
 
 /**
  * Closes an already-opened audio file, given its index in a 1-based list.
  */
-void cmd_close(int fnum)
+static inline void cmd_close(int fnum)
 {
 int err;
 
@@ -353,7 +394,9 @@ int err;
 	err = audio_close_file(fnum-1);
 
 	if (err)
+	{
 		printf("The specified file could not be closed.\r\n");
+	}
 }
 
 /**
@@ -362,7 +405,7 @@ int err;
  * In this mode, the user can configure the system before starting the graphic
  * mode.
  */
-void terminal_mode()
+static inline void terminal_mode()
 {
 char buffer[MAX_CHAR_BUFFER_SIZE];	// Buffer containing the inserted line
 char command[MAX_CHAR_BUFFER_SIZE];	// Parsed command
@@ -436,7 +479,7 @@ int err;
 		}
 		else if (strcmp(command, "record") == 0)
 		{
-			; 	// TODO: This command should be used to associate a recording to
+				// TODO: This command should be used to associate a recording to
 				// an opened file id.
 		}
 		else if(strlen(command) < 1)
@@ -462,7 +505,7 @@ int err;
 /**
  * Initializes and starts the GUI task, returning zero on success.
  */
-int start_gui_task()
+static inline int start_gui_task()
 {
 	return
 		ptask_short(
@@ -477,7 +520,7 @@ int start_gui_task()
 /**
  * Initializes and starts the UI task, returning zero on success.
  */
-int start_ui_task()
+static inline int start_ui_task()
 {
 	return
 		ptask_short(
@@ -492,7 +535,7 @@ int start_ui_task()
 /**
  * Initializes and starts the recording task, returning zero on success.
  */
-int start_microphone_task()
+static inline int start_microphone_task()
 {
 	return
 		ptask_short(
@@ -508,7 +551,7 @@ int start_microphone_task()
 /**
  * Initializes and starts the FFT task, returning zero on success.
  */
-int start_fft_task()
+static inline int start_fft_task()
 {
 	return
 		ptask_short(
@@ -525,7 +568,7 @@ int start_fft_task()
  * Initializes and starts the analyzer task, returning zero on success.
  * TODO: it may be necessary to start many of these
  */
-int start_analyzer_task()
+static inline int start_analyzer_task()
 {
 	// TODO: This task should be divided between multiple tasks, one for each
 	// opened file with an associated record trigger.
@@ -549,7 +592,7 @@ int start_analyzer_task()
  * closing the program if necessary. Also, it assumes that the task is in
  * cancelable state when called, see ptask_cancel().
  */
-void abort_task(int task_id)
+static inline void abort_task(int task_id)
 {
 	ptask_cancel(&main_state.tasks[task_id]);
 	ptask_join(&main_state.tasks[task_id]);
@@ -560,7 +603,7 @@ void abort_task(int task_id)
  * one. On error, it returns zero and the program should abort to avoid having
  * zombie tasks.
  */
-int initialize_tasks()
+static inline int initialize_tasks()
 {
 int err;
 
@@ -585,7 +628,7 @@ int err;
 /**
  * Blocks the thread execution to join all the active tasks.
  */
-void join_tasks()
+static inline void join_tasks()
 {
 // TODO: Update this function to reflect new tasks organization.
 
@@ -611,7 +654,7 @@ void join_tasks()
  * Forever loop for the main thread, until the graphic mode termination is
  * requested.
  */
-void main_wait()
+static inline void main_wait()
 {
 	ptask_mutex_lock(&main_state.mutex);
 
@@ -629,7 +672,7 @@ void main_wait()
  * program life.
  * Returns zero on success, a non zero value otherwise.
  */
-int program_init()
+static inline int program_init()
 {
 int err;
 
