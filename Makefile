@@ -6,7 +6,7 @@ vpath %.h inc inc/api
 vpath %.o obj
 
 DIR_RES = res
-
+DIR_SRC = src
 DIR_OBJ = obj
 DIR_DIS = dist
 DIR_DEP = dep
@@ -47,7 +47,7 @@ DOXFLAGS = > /dev/null 2> /dev/null
 
 # Phony tagets are always executed
 # IDEA: The help command should print what are the accepted make commands
-.PHONY: main directories compile clean clean-dep debug compile-debug super help docs docs-verbose
+.PHONY: main directories compile clean clean-dep debug compile-release compile-debug super help docs docs-verbose
 
 # Compiler
 CC = gcc
@@ -81,17 +81,19 @@ DOXYGEN = doxygen
 #---------------------------------------------------
 
 # Default make command
-main: directories compile docs super
+main: directories compile-release docs super
 
 # Default compilation command
 # NOTICE: in this case resources are always copied from res to distribution folder
-compile: CFLAGS += -D NDEBUG
+compile-release: CFLAGS += -D NDEBUG
+compile-release: compile
+
 compile: $(DEST)
 	cp -R $(DIR_RES) $(DIR_DIS)
 
 # Clean all make sub-products
 clean:
-	rm -rf $(DIR_OBJ)/*.o $(DIR_DIS)/*
+	rm -rf $(DIR_OBJ)/*.o $(DIR_DIS)/* $(DIR_SRC)/res
 
 clean-dep:
 	rm -f $(DIR_DEP)/*.d
@@ -104,8 +106,8 @@ debug: directories compile-debug
 
 compile-debug: CFLAGS += -ggdb -O0
 compile-debug: LDFLAGS += -ggdb
-compile-debug: $(DEST)
-	cp -R $(DIR_RES) $(DIR_DIS)
+compile-debug: compile
+	cp -R $(DIR_RES) $(DIR_SRC)
 
 # Generate documentation (by default suppresses any output)
 docs:

@@ -9,7 +9,7 @@
             "args": ["../test_files"],
             /*"environment": [{"name": "squid", "value": "clam"}],*/
             "cwd": "${workspaceRoot}/src",
-            "externalConsole": true,
+            "externalConsole": false,
             "logging": {
                 "moduleLoad": false,
                 "trace": true

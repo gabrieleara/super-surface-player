@@ -1,3 +1,13 @@
+/**
+ * @file constants.h
+ * @brief All globally shared constants in the system
+ *
+ * @author Gabriele Ara
+ * @date 2019/01/17
+ *
+ */
+
+
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
@@ -5,24 +15,29 @@
 // GLOBAL SHARED CONSTANTS
 //-------------------------------------------------------------
 
-#define MAX_CHAR_BUFFER_SIZE	256		// Size of any char buffer used in the
-										// system
-#define MAX_DIRECTORY_LENGTH	256		// Maximum length of a directory name
+#define MAX_CHAR_BUFFER_SIZE	256		///< Size of any char buffer used in the system
+#define MAX_DIRECTORY_LENGTH	256		///< Maximum length of a directory name
 
 //-------------------------------------------------------------
 // RECORDING CONSTANTS
 //-------------------------------------------------------------
-#define AUDIO_DESIRED_RATE		44100	// Desired acquisition rate (Hz)
-#define AUDIO_DESIRED_FRAMES	4096	// Desired acquisition buffer dimension
-#define AUDIO_NUM_BUFFERS		10		// Number of buffers related to audio
-										// acquisition
+#define AUDIO_DESIRED_RATE		44100	///< Desired acquisition rate (Hz)
 
-// Converts a certain number of frames in milliseconds, given current
-// capture rate
+#define AUDIO_DESIRED_FRAMES	4096
+										///< Desired acquisition buffer dimension.
+										///< NOTICE: that the bigger this is,
+										///< the bigger the latency of the system
+
+#define AUDIO_NUM_BUFFERS		10
+										///< Number of buffers related to audio
+										///< acquisition
+
+/// Converts a certain number of frames in milliseconds, given current
+/// capture rate.
 #define FRAMES_TO_MS(frames,rate) \
 	((1000L * STATIC_CAST(long,frames)) / STATIC_CAST(long,rate))
 
-// NOTICE: that the bigger this is, the bigger the latency of the system
+/// The desired period of the audio acquisition task
 #define AUDIO_DESIRED_PERIOD \
 	FRAMES_TO_MS(AUDIO_DESIRED_FRAMES,AUDIO_DESIRED_RATE)
 
@@ -36,39 +51,40 @@
 // COLORS
 //-------------------------------------------------------------
 
-#define COLOR_MODE	(32)			// default color mode
+#define COLOR_MODE	(32)			///< default color mode
 
-#define COLOR_WHITE		(0xFFFFFF)	// white
-#define COLOR_BKG		(0xF0F0F0)	// light gray background
-#define COLOR_PRIM_DARK	(0x388E3C)	// dark primary color
-#define COLOR_PRIM		(0x4CAF50)	// primary color
-#define COLOR_PRIM_LIGH	(0xC8E6C9)	// light prmary color
-#define COLOR_ACCENT	(0x8BC34A)	// accent color
-#define COLOR_TEXT		(0xFFFFFF)	// text/icons over a primary or accent color
-#define COLOR_TEXT_PRIM	(0x212121)	// primary text color, over a background
-#define COLOR_TEXT_SECN	(0x757575)	// secondary text color, over a prim or accent
-#define COLOR_DIVIDER	(0xBDBDBD)	// color used for dividers
+#define COLOR_WHITE		(0xFFFFFF)	///< white
+#define COLOR_BKG		(0xF0F0F0)	///< light gray background
+#define COLOR_PRIM_DARK	(0x388E3C)	///< dark primary color
+#define COLOR_PRIM		(0x4CAF50)	///< primary color
+#define COLOR_PRIM_LIGH	(0xC8E6C9)	///< light prmary color
+#define COLOR_ACCENT	(0x8BC34A)	///< accent color
+#define COLOR_TEXT		(0xFFFFFF)	///< text/icons over a primary or accent color
+#define COLOR_TEXT_PRIM	(0x212121)	///< primary text color, over a background
+#define COLOR_TEXT_SECN	(0x757575)	///< secondary text color, over a prim or accent
+#define COLOR_DIVIDER	(0xBDBDBD)	///< color used for dividers
 
 //-------------------------------------------------------------
 // Window dimensions
 //-------------------------------------------------------------
 
-#define WIN_X		(0)					// start of coordinates x
-#define WIN_Y		(0)					// start of coordinates y
-#define WIN_MX		(1280)				// window x resolution
-#define WIN_MY		(672)				// window y resolution
+#define WIN_X		(0)				///< start of coordinates x
+#define WIN_Y		(0)				///< start of coordinates y
+#define WIN_MX		(1280)			///< window x resolution
+#define WIN_MY		(672)			///< window y resolution
 
-#define PADDING		(12)				// base value for padding that can be
-										// used by child elements
+#define PADDING		(12)
+									///< base value for padding that can be
+									///< used by child elements
 
 //-------------------------------------------------------------
 // The Footer will contain some messages printed by the program
 //-------------------------------------------------------------
 
-#define FOOTER_X	(WIN_X)				// footer position x
-#define FOOTER_Y	(624)				// footer position y
-#define FOOTER_MX	(WIN_MX)			// footer max x
-#define FOOTER_MY	(WIN_MY)			// footer max y
+#define FOOTER_X	(WIN_X)			///< footer position x
+#define FOOTER_Y	(624)			///< footer position y
+#define FOOTER_MX	(WIN_MX)		///< footer max x
+#define FOOTER_MY	(WIN_MY)		///< footer max y
 
 /*
 	 __________________________________________________________
@@ -88,15 +104,17 @@
 	colors will provide informations when a file is executing.
 */
 
-#define SIDE_X		(WIN_MX * 7/10)		// side panel position x
-#define SIDE_Y		(0)					// side panel position y
-#define SIDE_MX		(WIN_MX)			// side panel max x
-#define SIDE_MY		(FOOTER_Y)			// side panel max y
+#define SIDE_X		(WIN_MX * 7/10)		///< side panel position x
+#define SIDE_Y		(0)					///< side panel position y
+#define SIDE_MX		(WIN_MX)			///< side panel max x
+#define SIDE_MY		(FOOTER_Y)			///< side panel max y
 
 
-#define SIDE_ELEM_X	(SIDE_X)			// side panel element position x
-#define SIDE_ELEM_MX (SIDE_MX-SIDE_X)	// side panel max x
-#define SIDE_ELEM_MY ((SIDE_MY-SIDE_Y)/8)// side panel max y
+#define SIDE_ELEM_X	(SIDE_X)				///< side panel element position x
+#define SIDE_ELEM_MX (SIDE_MX-SIDE_X)		///< side panel max x
+#define SIDE_ELEM_MY ((SIDE_MY-SIDE_Y)/8)	///< side panel max y
+
+// TODO: document next constants
 
 #define SIDE_ELEM_NAME_X	(SIDE_ELEM_X + 12)
 #define SIDE_ELEM_NAME_Y	(20)
@@ -168,11 +186,11 @@
 	dimensions specified here are the borders of the graph.
 */
 
-#define FFT_P		(PADDING * 2)		// fft graph padding
-#define FFT_X		(0 + FFT_P)			// fft graph position x
-#define FFT_Y		(0 + FFT_P)			// fft graph position y
-#define FFT_MX		(SIDE_X - FFT_P)	// fft graph max x
-#define FFT_MY		(FOOTER_Y/2 - FFT_P)// fft graph max y
+#define FFT_P		(PADDING * 2)			///< fft graph padding
+#define FFT_X		(0 + FFT_P)				///< fft graph position x
+#define FFT_Y		(0 + FFT_P)				///< fft graph position y
+#define FFT_MX		(SIDE_X - FFT_P)		///< fft graph max x
+#define FFT_MY		(FOOTER_Y/2 - FFT_P)	///< fft graph max y
 
 /*
 	 __________________________________________________________
@@ -192,15 +210,35 @@
 	recorder in the time domain.
 	The scale and background are contained in a bitmap file, thus they are
 	static.
-	The only thing drawn by the program dynamically is the time graph, so the
-	dimensions specified here are the borders of the graph.
+	The only thing drawn by the program dynamically is the time plot, so the
+	dimensions specified here are the borders of the plot.
 */
 
-#define TIME_P	(PADDING*2)				// time graph padding
-#define TIME_X	(0)						// time graph position x
-#define TIME_Y	(FFT_MY)				// time graph position y
-#define TIME_MX	(SIDE_X)				// time graph max x
-#define TIME_MY (FOOTER_Y)				// time graph max y
+// TODO: chanhe comments
+#define TIME_P	(PADDING*2)				///< time plot padding
+#define TIME_X	(0)						///< time plot position x
+#define TIME_Y	(FOOTER_Y/2 + TIME_P)	///< time plot position y
+#define TIME_MX	(SIDE_X)				///< time plot max x
+#define TIME_MY	(FOOTER_Y)				///< time plot max y
+
+#define TIME_PLOT_X		(TIME_X + TIME_P)
+#define TIME_PLOT_Y		(TIME_Y + TIME_P)
+#define TIME_PLOT_MX	(TIME_MX - TIME_P)
+#define TIME_PLOT_MY	(TIME_MY - TIME_P)
+
+#define TIME_PLOT_WIDTH		(TIME_PLOT_MX - TIME_PLOT_X)	///< time plot width
+#define TIME_PLOT_HEIGHT	(TIME_PLOT_MY - TIME_PLOT_Y)	///< time plot height
+
+// TODO: change TIME_MAX_HEIGHT macro to something much more readable please
+
+#define TIME_SPEED			(1)		///< The speed at which the time plot moves
+#define TIME_MAX_HEIGHT		((TIME_PLOT_HEIGHT - 1 - (2 * TIME_P)))
+									///< The maximum height of the time plot content
+#define TIME_MAX_AMPLITUDE	(1000000)
+									///< The amplitude which corresponds to
+									///< the maximum height
+
+
 
 //-------------------------------------------------------------
 // TASKS CONSTANTS
@@ -218,10 +256,10 @@
 #define WCET_UNKNOWN (0)
 
 #ifdef NDEBUG
-	#define GET_PRIO(prio) (prio)	// If not in debug mode, this does nothing
+	#define GET_PRIO(prio) (prio)	///< If not in debug mode, this does nothing
 #else
-	#define GET_PRIO(prio) (0)		// In debug mode real time scheduling is
-#endif								// disabled, so priority must be zero
+	#define GET_PRIO(prio) (0)		///< In debug mode real time scheduling is
+#endif								///< disabled, so priority must be zero
 
 // TODO: Periods of tasks should be chosen in a more rigorous manneer, perform
 // a scheduling analysis once all tasks are correctly defined. Also, priority
@@ -231,10 +269,9 @@
 // GUI TASK
 
 #define TASK_GUI_WCET		(WCET_UNKNOWN)
-#define TASK_GUI_PERIOD		(30)	// a little more than 30 fps
-#define TASK_GUI_DEADLINE	(30)	// same as period
-#define TASK_GUI_PRIORITY	(1)		// lowest priority, missing a frame is not a
-									// big deal
+#define TASK_GUI_PERIOD		(30)	///< a little more than 30 fps
+#define TASK_GUI_DEADLINE	(30)	///< same as period
+#define TASK_GUI_PRIORITY	(1)		///< lowest priority, missing a frame is not a big deal
 
 // USER INTERACTION TASK
 
