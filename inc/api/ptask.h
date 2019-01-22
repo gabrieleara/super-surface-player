@@ -231,7 +231,7 @@ typedef int ptask_cab_id_t;
  * All other values will make this function fail, returning EINVAL. On success
  * this function returns 0.
  *
- * NOTE: Scheduler should only be set once per process execution, before all
+ * NOTICE: Scheduler should only be set once per process execution, before all
  * other threads than the main thread have been started.
  */
 extern int ptask_set_scheduler(int scheduler);
@@ -242,7 +242,7 @@ extern int ptask_set_scheduler(int scheduler);
  *
  * Returns zero otherwise.
  *
- * NOTE: on success this function overwrites any value it is inside the given
+ * NOTICE: on success this function overwrites any value it is inside the given
  * ptask_t element. Do not use an already-initialized ptask object with this
  * function unless it has been previously destroyed/joined. The ptask_short
  * function already destroys tasks that failed initialization.
@@ -253,7 +253,7 @@ extern int ptask_init(ptask_t *ptask);
  * Sets each of the indicated parameters of a given ptask.
  * Returns 0 on success, a non zero value otherwise.
  *
- * NOTE: this function can be called only before starting the ptask.
+ * NOTICE: this function can be called only before starting the ptask.
  */
 extern int ptask_set_params(ptask_t *ptask, long wcet, int period, int deadline,
 	int priority);
@@ -283,10 +283,10 @@ extern int ptask_short(ptask_t *ptask,
  * Cancels a previously started ptask, if it is still running.
  * Returns 0 on success, a non zero value otherwise.
  *
- * NOTE: this function creates only a cancelation request, thus is not
+ * NOTICE: this function creates only a cancelation request, thus is not
  * blocking. To be sure that a ptask is actually terminated call ptask_join.
  *
- * NOTE: this function may lead global values to inconsistency and should not
+ * NOTICE: this function may lead global values to inconsistency and should not
  * be used unless the program has to be forcefully terminated. Please a custom
  * termination condition inside your tasks to terminate them gracefully.
  */
@@ -314,7 +314,7 @@ extern void ptask_start_period(ptask_t *ptask);
  *
  * This function shall be called by the task itself.
  *
- * NOTE: Even though the task calls time_add_ms() after the wake‐up time, the
+ * NOTICE: Even though the task calls time_add_ms() after the wake‐up time, the
  * computation is correct.
  * TODO: remove this note?
  */
@@ -405,7 +405,7 @@ extern int ptask_cab_init(ptask_cab_t *ptask_cab, int n, int size,
  *
  * Returns zero on success, a non zero value otherwise.
  *
- * NOTE: Make sure that all the readers released their reading buffers before a
+ * NOTICE: Make sure that all the readers released their reading buffers before a
  * new value is inserted into the cab.
  */
 extern int ptask_cab_reset(ptask_cab_t *ptask_cab);
@@ -423,7 +423,7 @@ extern int ptask_cab_reset(ptask_cab_t *ptask_cab);
  *
  * It returns zero on success, a non zero value otherwise.
  *
- * NOTE: Attempting to reserve a buffer using a non already initialized cab
+ * NOTICE: Attempting to reserve a buffer using a non already initialized cab
  * results in undefined behavior.
  */
 extern int ptask_cab_reserve(ptask_cab_t *ptask_cab, void* buffer[],
@@ -439,10 +439,10 @@ extern int ptask_cab_reserve(ptask_cab_t *ptask_cab, void* buffer[],
  *
  * It returns zero on success, a non zero value otherwise.
  *
- * NOTE: Attempting to put a message inside a non already initialized cab
+ * NOTICE: Attempting to put a message inside a non already initialized cab
  * results in undefined behavior.
  *
- * NOTE: Attempting to put a message inside a non previously reserved buffer
+ * NOTICE: Attempting to put a message inside a non previously reserved buffer
  * may lead to inconsistency if the buffer is actually being used by only one
  * ptask in readig mode.
  */
@@ -463,7 +463,7 @@ extern int ptask_cab_putmes(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id);
  * EAGAIN is returned if no value has been put inside the cab or the cab has
  * been resetted using ptask_cab_reset.
  *
- * NOTE: Attempting to reserve a buffer using a non already initialized cab
+ * NOTICE: Attempting to reserve a buffer using a non already initialized cab
  * results in undefined behavior.
  */
 extern int ptask_cab_getmes(ptask_cab_t *ptask_cab, void* buffer[],
@@ -479,7 +479,9 @@ extern int ptask_cab_getmes(ptask_cab_t *ptask_cab, void* buffer[],
  * NOTICE: Attempting to release a buffer within a non already initialized cab
  * results in undefined behavior.
  *
- * NOTICE: This can be used also to cancel a reservation request.
+ * NOTICE: This can be used also to cancel a reservation request, thus this
+ * function can be called once also after a successful call to
+ * ptask_cab_reserve.
  */
 extern int ptask_cab_unget(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id);
 
