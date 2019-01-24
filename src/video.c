@@ -362,6 +362,7 @@ int num, i;
 
 /**
  * Converts a value of FFT energy into the height of its plot in pixels.
+ * TODO: plot in dB!
  */
 int fft_average_to_height(double average) {
 	average = average/1000;
@@ -373,78 +374,76 @@ int fft_average_to_height(double average) {
 }
 
 /**
- * Draws the FFT of the (last) recorded audio on the screen.
+ * Draws the actual fft plot, given the array of amplitudes associated with each
+ * frequency.
  */
-static inline void draw_fft()
+static inline void draw_fft_plot(const double amplitudes[], const int frames)
 {
-int buffer_index;
-double *buffer;
-static double half_buffer[AUDIO_DESIRED_HALFCOMPLEX];
+// Since it's impossible to have a single frequency per pixel, we will
+// average the displayed value over a window of frequencies.
+// The average will take into account that some frequencies may belong
+// partially to two windows, each contributing with a certain degree.
+double frame_window_per_pixel;
 
-int rrate;			// acquisition rate
-int rframes;		// number of frames per audio sample
+double average;				// The value to be plotted for each column
 
-	rrate	= audio_get_rrate();
-	rframes = audio_get_last_fft(&buffer, &buffer_index);
+double window_end;			// The precise ending of the current window.
+							// It will be used to calculate the weight of the
+							// corresponding index (obtained by floor operation).
+							// The end of the previous window is also the begin
+							// of the subsequent one.
 
-	if (rframes < 1)
-	{
-		// No FFT available yet
-		return;
-	}
+double first_weight;		// The degree with which the first frequency belongs
+							// to the current window
+double last_weight;			// The degree with which the last frequency belongs
+							// to the current window
 
-	// TODO: check whether it is fixed now
-	int number_frames = AUDIO_FRAMES_TO_HALFCOMPLEX(rframes);
+int first_index;			// The index of the first frequency (partially)
+							// belonging to the current window
+int last_index;				// The index of the last frequency (partially)
+							// belonging to the current window
 
-	// Round rframes to be multiple of 2 if it is odd
-	// TODO : check the half-complex structure whether it uses the middle element if odd
-	// rframes = (rframes / 2) * 2;
+int pixel_offset;			// The offset of the current pixel within the FFT plot
+int i;
 
-	// FIXME : Actually the half-complex format uses the first element (index 0)
-	// to store a pure real value, while the n/2 element (only if n is even) is
-	// used to store another pure real value, change this method to reflect that
-	// behavior
-	for (int i = 1; i < number_frames; ++i) {
-		half_buffer[i] = sqrt(
-			buffer[i] * buffer[i] +
-			buffer[rframes-i] * buffer[rframes - i]
-		);
-	}
-
-	audio_free_last_fft(buffer_index);
-
-	rframes = number_frames;
-
-	double frame_window_per_pixel = STATIC_CAST(double,rframes) /
+	frame_window_per_pixel = STATIC_CAST(double,frames) /
 		STATIC_CAST(double,FFT_PLOT_WIDTH);
 
-	double average;
-	double first_frame = 0.;
-	double last_frame;
+	// Initializing variables for first iteration.
+	// The loop uses some optimizations to avoid calculating multiple times
+	// same values.
+	window_end	= 0.;
+	last_weight	= 0.;	// Values exactly on the edge of a window are considered
+						// fully part of the subsequent window. Example: index 0
+						// has always weight 1.
+	last_index	= 0;
 
-	double first_frame_weigth;
-	double last_frame_weigth;
+	// For each pixel of the plot
+	for (pixel_offset = 0; pixel_offset < FFT_PLOT_WIDTH; ++pixel_offset) {
+		window_end	+= frame_window_per_pixel;
 
-	int first_frame_index;
-	int last_frame_index;
-	int i;
+		first_weight	= 1. - last_weight;
+		last_weight		= window_end - floor(window_end);
 
-	for (int pixel_offset = 0; pixel_offset < FFT_PLOT_WIDTH; ++pixel_offset) {
-		// NOTE: I can skip the multiplication
-		last_frame = first_frame + frame_window_per_pixel;
+		first_index		= last_index;
+		last_index		= STATIC_CAST(int, floor(window_end));
 
-		first_frame_weigth = 1 - (ceil(first_frame) - first_frame);
-		last_frame_weigth = last_frame - floor(first_frame);
-
-		first_frame_index = STATIC_CAST(int, floor(first_frame));
-		last_frame_index = STATIC_CAST(int, ceil(last_frame));
-
-		average = first_frame_weigth * half_buffer[first_frame_index];
-		for (i = first_frame_index+1; i < last_frame_index; ++i) {
-			average += half_buffer[i]; // weigth is one inside
+		// Each value is summed considering its weight
+		average = first_weight * amplitudes[first_index];
+		for (i = first_index+1; i < last_index; ++i) {
+			// Weight is one on the interior of the window
+			average += amplitudes[i];
 		}
-		average += last_frame_weigth * half_buffer[last_frame_index];
+		average += last_weight * amplitudes[last_index];
+
+		// Compute average, sum of weights is the frame_window_per_pixel value
 		average /= frame_window_per_pixel;
+
+		// double watch0 = first_weight + last_weight 	+ last_index - first_index - 1;
+		// double watch1 = frame_window_per_pixel;
+		// double watch2 = watch0 - watch1;
+
+		// Compute the height of the pixel column and plot it
 		average = fft_average_to_height(average);
 
 		rectfill(gui_state.virtual_screen,
@@ -454,8 +453,55 @@ int rframes;		// number of frames per audio sample
 				 FFT_PLOT_MY	- 1,
 				 COLOR_ACCENT);
 
-		first_frame = last_frame;
+		// window_begin = window_end;
 	}
+}
+
+/**
+ * Draws the FFT of the (last) recorded audio on the screen.
+ */
+static inline void draw_fft()
+{
+int buffer_index;		// The index of the fft buffer from the cab, used to
+						// release it later
+/*const*/ double *buffer;	// The fft buffer from the cab
+static double amplitudes[AUDIO_DESIRED_HALFCOMPLEX];
+						// The output of the fft is a complex fft, with the
+						// output in half-complex format.
+						// However, to display it we will simply plot the norm
+						// of said complex numbers
+int rrate;				// Actual acquisition rate
+int rframes;			// Number of frames per audio sample, which is also the
+						// number of values within the fft buffer
+
+	rrate	= audio_get_rrate();
+	rframes = audio_get_last_fft(&buffer, &buffer_index);
+
+	if (rframes < 1)
+	{
+		// No FFT available yet, there is nothing to display
+		return;
+	}
+
+	// Actual number of frequencies that will be used to plot, the first and
+	// last values of the fft are not used because they are real numbers which
+	// do not represent any actual frequency
+	int number_frames = AUDIO_FRAMES_TO_HALFCOMPLEX(rframes);
+
+	// Translating from half-complex notation of the fft to magnitudes only.
+	// To the real value of index i (one-based), the corresponding complex value
+	// is the N-ith value, where N is the total length of the fft array
+	for (int i = 1; i <= number_frames; ++i) {
+		amplitudes[i-1] = sqrt(
+			buffer[i] * buffer[i] +
+			buffer[rframes-i] * buffer[rframes-i]
+		);
+	}
+
+	// We don't need the original buffer anymore
+	audio_free_last_fft(buffer_index);
+
+	draw_fft_plot(amplitudes, number_frames);
 }
 
 /**
