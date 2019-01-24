@@ -10,6 +10,8 @@
  *
  */
 
+// IDEA: add an antialiasing filter to plots to smooth them
+
 // Standard libraries
 #include <stdbool.h>
 #include <stdio.h>
@@ -432,7 +434,7 @@ int rframes;		// number of frames per audio sample
 		last_frame = first_frame + frame_window_per_pixel;
 
 		first_frame_weigth = 1 - (ceil(first_frame) - first_frame);
-		double last_frame_weigth = last_frame - floor(first_frame);
+		last_frame_weigth = last_frame - floor(first_frame);
 
 		first_frame_index = STATIC_CAST(int, floor(first_frame));
 		last_frame_index = STATIC_CAST(int, ceil(last_frame));

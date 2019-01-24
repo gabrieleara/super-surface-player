@@ -15,16 +15,16 @@
 //                         GLOBAL SHARED CONSTANTS
 // -----------------------------------------------------------------------------
 
-#define MAX_CHAR_BUFFER_SIZE	256		///< Size of any char buffer used in the system
-#define MAX_DIRECTORY_LENGTH	256		///< Maximum length of a directory name
+#define MAX_CHAR_BUFFER_SIZE	(256)	///< Size of any char buffer used in the system
+#define MAX_DIRECTORY_LENGTH	(256)	///< Maximum length of a directory name
 
 // -----------------------------------------------------------------------------
 //                           RECORDING CONSTANTS
 // -----------------------------------------------------------------------------
 
-#define AUDIO_DESIRED_RATE		44100	///< Desired acquisition rate (Hz)
+#define AUDIO_DESIRED_RATE		(44100)	///< Desired acquisition rate (Hz)
 
-#define AUDIO_DESIRED_FRAMES	4096
+#define AUDIO_DESIRED_FRAMES	(4096)
 										///< Desired acquisition buffer dimension.
 										///< NOTICE: that the bigger this is,
 										///< the bigger the latency of the system
@@ -42,12 +42,13 @@
 										///< magnitude-only half-complex FFT
 										///< buffer.
 
-#define AUDIO_NUM_BUFFERS		10
+// TODO: actually this should be NTasks that use them + 1
+#define AUDIO_NUM_BUFFERS		(10)
 										///< Number of buffers related to audio
 										///< acquisition
 
 /// Converts a certain number of frames in milliseconds, given current
-/// capture rate.
+/// capture rate
 #define FRAMES_TO_MS(frames,rate) \
 	((1000L * STATIC_CAST(long,frames)) / STATIC_CAST(long,rate))
 
@@ -65,40 +66,50 @@
 // Colors
 //-------------------------------------------------------------
 
-#define COLOR_MODE		(32)		///< default color mode
+#define COLOR_MODE		(32)		///< Default color mode
 
-#define COLOR_WHITE		(0xFFFFFF)	///< white
-#define COLOR_BKG		(0xF0F0F0)	///< light gray background
-#define COLOR_PRIM_DARK	(0x388E3C)	///< dark primary color
-#define COLOR_PRIM		(0x4CAF50)	///< primary color
-#define COLOR_PRIM_LIGH	(0xC8E6C9)	///< light prmary color
-#define COLOR_ACCENT	(0x8BC34A)	///< accent color
-#define COLOR_TEXT		(0xFFFFFF)	///< text/icons over a primary or accent color
-#define COLOR_TEXT_PRIM	(0x212121)	///< primary text color, over a background
-#define COLOR_TEXT_SECN	(0x757575)	///< secondary text color, over a prim or accent
-#define COLOR_DIVIDER	(0xBDBDBD)	///< color used for dividers
+#define COLOR_WHITE		(0xFFFFFF)	///< White
+#define COLOR_BKG		(0xF0F0F0)	///< Light gray background
+#define COLOR_PRIM_DARK	(0x388E3C)	///< Dark primary color
+#define COLOR_PRIM		(0x4CAF50)	///< Primary color
+#define COLOR_PRIM_LIGH	(0xC8E6C9)	///< Light prmary color
+#define COLOR_ACCENT	(0x8BC34A)	///< Accent color
+#define COLOR_TEXT		(0xFFFFFF)	///< Text/icons over a primary or accent color
+#define COLOR_TEXT_PRIM	(0x212121)	///< Primary text color, over a background
+#define COLOR_TEXT_SECN	(0x757575)	///< Secondary text color, over a prim or accent
+#define COLOR_DIVIDER	(0xBDBDBD)	///< Color used for dividers
 
 //-------------------------------------------------------------
 // Window dimensions
 //-------------------------------------------------------------
 
-#define WIN_X		(0)				///< start of coordinates x
-#define WIN_Y		(0)				///< start of coordinates y
-#define WIN_MX		(1280)			///< window x resolution
-#define WIN_MY		(672)			///< window y resolution
+// NOTICE: MX/MY values are considered outside the box
+
+#define WIN_X		(0)				///< Start of coordinates x
+#define WIN_Y		(0)				///< Start of coordinates y
+#define WIN_MX		(1280)			///< Window x resolution
+#define WIN_MY		(672)			///< Window y resolution
+
+#define WIN_WIDTH	(WIN_MX-WIN_X)	///< Window width
+#define WIN_HEIGHT	(WIN_MY-WIN_Y)	///< Window height
 
 #define PADDING		(12)
-									///< base value for padding that can be
+									///< Base value for padding that can be
 									///< used by child elements
 
 //-------------------------------------------------------------
 // The Footer will contain some messages printed by the program
+// IDEA: change this with some commands
 //-------------------------------------------------------------
 
-#define FOOTER_X	(WIN_X)			///< footer position x
-#define FOOTER_Y	(624)			///< footer position y
-#define FOOTER_MX	(WIN_MX)		///< footer max x
-#define FOOTER_MY	(WIN_MY)		///< footer max y
+#define FOOTER_WIDTH	(WIN_WIDTH)	///< Footer width
+#define FOOTER_HEIGHT	(48)		///< Footer height
+
+#define FOOTER_X	(WIN_X)			///< Footer position x
+#define FOOTER_Y	(WIN_MY-FOOTER_HEIGHT)
+									///< Footer position y
+#define FOOTER_MX	(WIN_MX)		///< Footer max x
+#define FOOTER_MY	(WIN_MY)		///< Footer max y
 
 /*
 	 __________________________________________________________
@@ -115,68 +126,101 @@
 	|__________________________________________________________|
 
 	The side panel contains the list of all the files opened by the program,
-	colors will provide informations when a file is executing.
+	TODO: colors will provide informations when a file is executing.
 */
 
-#define SIDE_X		(WIN_MX * 7/10)		///< side panel position x
-#define SIDE_Y		(0)					///< side panel position y
-#define SIDE_MX		(WIN_MX)			///< side panel max x
-#define SIDE_MY		(FOOTER_Y)			///< side panel max y
+#define SIDE_X		(WIN_MX * 7/10)		///< Side panel position x
+#define SIDE_Y		(0)					///< Side panel position y
+#define SIDE_MX		(WIN_MX)			///< Side panel max x
+#define SIDE_MY		(FOOTER_Y)			///< Side panel max y
 
+#define SIDE_WIDTH	(SIDE_MX-SIDE_X)	///< Side panel width
+#define SIDE_HEIGHT	(SIDE_MY-SIDE_Y)	///< Side panel height
 
-#define SIDE_ELEM_X	(SIDE_X)				///< side panel element position x
-#define SIDE_ELEM_MX (SIDE_MX-SIDE_X)		///< side panel max x
-#define SIDE_ELEM_MY ((SIDE_MY-SIDE_Y)/8)	///< side panel max y
+#define SIDE_NUM_ELEMENTS	(8)
+										///< The maximum number of elements in
+										///< the side panel
+
+#define SIDE_ELEM_X	(SIDE_X)				///< Side panel element position x
+
+#define SIDE_ELEM_WIDTH		(SIDE_WIDTH)	///< Side panel element width
+#define SIDE_ELEM_HEIGHT	(SIDE_HEIGHT/SIDE_NUM_ELEMENTS)
+											///< Side panel element height
+
+#define SIDE_ELEM_MX	(SIDE_MX-SIDE_X)	///< Side panel element max x
+#define SIDE_ELEM_MY	(SIDE_ELEM_X + SIDE_ELEM_HEIGHT)
+											///< Side panel element max y
 
 // TODO: document next constants
 
 #define SIDE_ELEM_NAME_X	(SIDE_ELEM_X + 12)
-#define SIDE_ELEM_NAME_Y	(20)
+											///< Side panel element name label
+											///< absolute x (same for each element)
+#define SIDE_ELEM_NAME_Y	(20)			///< Side panel element name label relative y
 
-#define SIDE_ELEM_VOL_LABEL_X	(12)
-#define SIDE_ELEM_VOL_LABEL_Y	(40)
-#define SIDE_ELEM_PAN_LABEL_X	(12+128)
-#define SIDE_ELEM_PAN_LABEL_Y	(40)
-#define SIDE_ELEM_FRQ_LABEL_X	(12+256-8)
-#define SIDE_ELEM_FRQ_LABEL_Y	(40)
+#define SIDE_ELEM_VOL_LABEL_X	(12)		///< Side panel element volume label x (TODO: relative?)
+#define SIDE_ELEM_VOL_LABEL_Y	(40)		///< Side panel element volume label relative y
+#define SIDE_ELEM_PAN_LABEL_X	(12+128)	///< Side panel element panning label relative x
+#define SIDE_ELEM_PAN_LABEL_Y	(40)		///< Side panel element panning label relative y
+#define SIDE_ELEM_FRQ_LABEL_X	(12+256-8)	///< Side panel element frequency label relative x
+#define SIDE_ELEM_FRQ_LABEL_Y	(40)		///< Side panel element frequency label relative y
 
-#define SIDE_ELEM_VAL_Y		(54)
+#define SIDE_ELEM_VAL_Y		(54)			///< Side panel element text value y
 
-#define SIDE_ELEM_VOL_X		(SIDE_ELEM_X + 64)
-#define SIDE_ELEM_PAN_X		(SIDE_ELEM_X + 64+128)
-#define SIDE_ELEM_FRQ_X		(SIDE_ELEM_X + 64+256)
-
-
+#define SIDE_ELEM_VOL_X		(SIDE_ELEM_X + 64)		///< Side element volume value x
+#define SIDE_ELEM_PAN_X		(SIDE_ELEM_X + 64+128)	///< Side element panning value x
+#define SIDE_ELEM_FRQ_X		(SIDE_ELEM_X + 64+256)	///< Side element frequency value x
 
 // BUTTONS, NOTICE: these values are relative to the elem position!
 
-#define BUTTON_PLAY_X		(360)
-#define BUTTON_PLAY_Y		(10)
-#define BUTTON_PLAY_MX		(374)
-#define BUTTON_PLAY_MY		(30)
+#define BUTTON_PLAY_X		(360)		///< Button play relative x
+#define BUTTON_PLAY_Y		(10)		///< Button play relative y
+#define BUTTON_PLAY_MX		(374)		///< Button play relative mx
+#define BUTTON_PLAY_MY		(30)		///< Button play relative my
 
 #define BUTTON_ROW_Y		(50)
+										///< Buttons row position y
+										///< Used in CHECK_BUTTON_POSX() and
+										///< CHECK_BUTTON_POSY() macros
 #define BUTTON_ROW_MY		(66)
+										///< Buttons row max y
+										///< Used in CHECK_BUTTON_POSX() and
+										///< CHECK_BUTTON_POSY() macros
 
-#define BUTTON_VOL_DOWN_X	(40)
-#define BUTTON_VOL_DOWN_MX	(56)
-#define BUTTON_PAN_DOWN_X	(40 + 128)
-#define BUTTON_PAN_DOWN_MX	(56 + 128)
-#define BUTTON_FRQ_DOWN_X	(40 + 256)
-#define BUTTON_FRQ_DOWN_MX	(56 + 256)
+#define BUTTON_VOL_DOWN_X	(40)		///< Button volume down position x
+#define BUTTON_VOL_DOWN_MX	(56)		///< Button volume down max x
+#define BUTTON_PAN_DOWN_X	(40 + 128)	///< Button panning down position x
+#define BUTTON_PAN_DOWN_MX	(56 + 128)	///< Button panning down max x
+#define BUTTON_FRQ_DOWN_X	(40 + 256)	///< Button frequency down position x
+#define BUTTON_FRQ_DOWN_MX	(56 + 256)	///< Button frequency down max x
 
-#define BUTTON_VOL_UP_X		(102)
-#define BUTTON_VOL_UP_MX	(118)
-#define BUTTON_PAN_UP_X		(102 + 128)
-#define BUTTON_PAN_UP_MX	(118 + 128)
-#define BUTTON_FRQ_UP_X		(102 + 256)
-#define BUTTON_FRQ_UP_MX	(118 + 256)
+#define BUTTON_VOL_UP_X		(102)		///< Button volume up position x
+#define BUTTON_VOL_UP_MX	(118)		///< Button volume up max x
+#define BUTTON_PAN_UP_X		(102 + 128)	///< Button panning up position x
+#define BUTTON_PAN_UP_MX	(118 + 128)	///< Button panning up max x
+#define BUTTON_FRQ_UP_X		(102 + 256)	///< Button frequency up position x
+#define BUTTON_FRQ_UP_MX	(118 + 256)	///< Button frequency up max x
 
+/// Concatenates two strings to form another macro.
 #define PASTER(button, dim) BUTTON_ ## button ## _ ## dim
-#define CHECK_BUTTON_POSY(posy, button) (posy >= PASTER(button,Y) && posy < PASTER(button,MY))
-#define CHECK_BUTTON_POSX(posx, button) (posx >= PASTER(button,X) && posx < PASTER(button,MX))
 
+/// Checks whether the given position is inside the given button y boundaries.
+/// Example usage:
+/// \begincode
+/// // To check if the button is on the same y position of the play button
+/// CHECK_BUTTON_POSY(relative_mouse_y_pos, PLAY)
+/// \endcode
+#define CHECK_BUTTON_POSY(posy, button) \
+	(posy >= PASTER(button,Y) && posy < PASTER(button,MY))
 
+/// Checks whether the given position is inside the given button x boundaries.
+/// Example usage:
+/// \begincode
+/// // To check if the button is on the same x position of the play button
+/// CHECK_BUTTON_POSX(relative_mouse_x_pos, PLAY)
+/// \endcode
+#define CHECK_BUTTON_POSX(posx, button) \
+	(posx >= PASTER(button,X) && posx < PASTER(button,MX))
 
 
 /*
@@ -193,6 +237,8 @@
 	|___________________________________________|______________|
 	|__________________________________________________________|
 
+	// TODO: check this description
+
 	The fft panel contains the fft of the sound received from the recorder.
 	The scale and background are contained in a bitmap file, thus they are
 	static.
@@ -200,19 +246,21 @@
 	dimensions specified here are the borders of the graph.
 */
 
-// FIXME: change the horrible "graph" word
-#define FFT_P		(PADDING * 2)			///< fft graph padding
-#define FFT_X		(0 + FFT_P)				///< fft graph position x
-#define FFT_Y		(0 + FFT_P)				///< fft graph position y
-#define FFT_MX		(SIDE_X - FFT_P)		///< fft graph max x
-#define FFT_MY		(FOOTER_Y/2 - FFT_P)	///< fft graph max y
+#define FFT_P		(PADDING * 2)			///< FFT panel padding
+#define FFT_X		(WIN_X + FFT_P)			///< FFT panel position x
+#define FFT_Y		(WIN_Y + FFT_P)			///< FFT panel position y
+#define FFT_MX		(SIDE_X - FFT_P)		///< FFT panel max x
+#define FFT_MY		(FOOTER_Y/2 - FFT_P)	///< FFT panel max y
 
-#define FFT_PLOT_X		(FFT_X + FFT_P)
-#define FFT_PLOT_Y		(FFT_Y + FFT_P)
-#define FFT_PLOT_MX		(FFT_MX - FFT_P)
-#define FFT_PLOT_MY		(FFT_MY - FFT_P)
+#define FFT_PLOT_X	(FFT_X + FFT_P)			///< FFT plot position x
+#define FFT_PLOT_Y	(FFT_Y + FFT_P)			///< FFT plot position y
+#define FFT_PLOT_MX	(FFT_MX - FFT_P)		///< FFT plot max x
+#define FFT_PLOT_MY	(FFT_MY - FFT_P)		///< FFT plot max y
 
-#define FFT_PLOT_WIDTH	(FFT_PLOT_MX - FFT_PLOT_X - 1)
+///< FFT plot width
+#define FFT_PLOT_WIDTH	(FFT_PLOT_MX - FFT_PLOT_X)
+
+///< FFT plot height
 #define FFT_PLOT_HEIGHT	(FFT_PLOT_MY - FFT_PLOT_Y)
 
 /*
@@ -238,26 +286,30 @@
 */
 
 // TODO: change comments
-#define TIME_P	(PADDING*2)				///< time plot padding
-#define TIME_X	(0)						///< time plot position x
-#define TIME_Y	(FOOTER_Y/2 + TIME_P)	///< time plot position y
-#define TIME_MX	(SIDE_X)				///< time plot max x
-#define TIME_MY	(FOOTER_Y)				///< time plot max y
+#define TIME_P	(PADDING*2)				///< Time panel padding
+#define TIME_X	(0)						///< Time panel position x
+#define TIME_Y	(FOOTER_Y/2 + TIME_P)	///< Time panel position y
+#define TIME_MX	(SIDE_X)				///< Time panel max x
+#define TIME_MY	(FOOTER_Y)				///< Time panel max y
 
-#define TIME_PLOT_X		(TIME_X + TIME_P)
-#define TIME_PLOT_Y		(TIME_Y + TIME_P)
-#define TIME_PLOT_MX	(TIME_MX - TIME_P)
-#define TIME_PLOT_MY	(TIME_MY - TIME_P)
+#define TIME_PLOT_X		(TIME_X + TIME_P)	///< Time plot position x
+#define TIME_PLOT_Y		(TIME_Y + TIME_P)	///< Time plot position y
+#define TIME_PLOT_MX	(TIME_MX - TIME_P)	///< Time plot max x
+#define TIME_PLOT_MY	(TIME_MY - TIME_P)	///< Time plot max y
 
-#define TIME_PLOT_WIDTH		(TIME_PLOT_MX - TIME_PLOT_X - 1)///< time plot width
-#define TIME_PLOT_HEIGHT	(TIME_PLOT_MY - TIME_PLOT_Y)	///< time plot height
+/// Time plot width
+#define TIME_PLOT_WIDTH		(TIME_PLOT_MX - TIME_PLOT_X)
+/// Time plot height
+#define TIME_PLOT_HEIGHT	(TIME_PLOT_MY - TIME_PLOT_Y)
 
-#define TIME_SPEED			(1)		///< The speed at which the time plot moves
+/// The speed at which the time plot moves (in pixels per frame)
+#define TIME_SPEED			(1)
+
+/// The maximum height of the time plot content
 #define TIME_MAX_HEIGHT		((TIME_PLOT_HEIGHT - 1 - (2 * TIME_P)))
-									///< The maximum height of the time plot content
+/// The amplitude which corresponds to the maximum height
 #define TIME_MAX_AMPLITUDE	(1000000)
-									///< The amplitude which corresponds to
-									///< the maximum height
+
 
 
 
