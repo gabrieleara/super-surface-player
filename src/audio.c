@@ -213,10 +213,8 @@ int		len;
 
 	base_name = basename(buffer);
 
-	// TODO: since the original buffer may be modified, I should check the
-	// length on the original path, shouldn't I?
-	// len = strnlen(buffer, MAX_CHAR_BUFFER_SIZE);
-	len = strnlen(path, MAX_CHAR_BUFFER_SIZE);
+	// Get the length of the basename
+	len = strnlen(base_name, MAX_CHAR_BUFFER_SIZE);
 
 	if (len >= MAX_AUDIO_NAME_LENGTH)
 	{
@@ -1135,8 +1133,8 @@ unsigned int i;			// Index used to copy data
 
 			// Get buffer on which operate
 			ptask_cab_reserve(&audio_state.fft.cab,
-							STATIC_CAST(void **, &out_buffer),
-							&out_buffer_index);
+				STATIC_CAST(void **, &out_buffer),
+				&out_buffer_index);
 
 			// Copy data onto new buffer
 			for (i = 0; i < audio_state.fft.rframes; ++i)
@@ -1144,11 +1142,15 @@ unsigned int i;			// Index used to copy data
 				out_buffer[i] = (double)in_buffer[i];
 			}
 
+			// NOTE: To be quickier I should release the in_buffer as soon as
+			// I get here, but this could lead to some confusion because there
+			// would be two releases and I should skip one depending on the condition
+
 			// Calculate in-place FFT using the plan computed above on
 			// current buffer
 			fftw_execute_r2r(audio_state.fft.plan, out_buffer, out_buffer);
 
-			// NOTE: Output of previous FFT is an halfcomplex notation of the
+			// NOTICE: Output of previous FFT is an halfcomplex notation of the
 			// FFT, it should be changed to a full array of magniutes to be
 			// printed.
 
@@ -1157,7 +1159,7 @@ unsigned int i;			// Index used to copy data
 		}
 		// Otherwise, do nothing
 
-		// Realease acquired buffer
+		// Realease acquired buffer if acquired
 		if (err == 0)
 			ptask_cab_unget(&audio_state.record.cab, in_buffer_index);
 
@@ -1168,10 +1170,6 @@ unsigned int i;			// Index used to copy data
 	}
 
 	// Cleanup
-	// Releasing unused half-empty buffer, this is needed because the reset does
-	// not release any buffer that was previously reserved
-	// TODO: why this cleanup call is commented out?
-	//ptask_cab_unget(&audio_state.record.cab, buffer_index);
 
 	// The reset can be done here because the only task that reserves buffers
 	// for writing purposes is this one
