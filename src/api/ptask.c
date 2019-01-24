@@ -535,7 +535,7 @@ int err = 0;
 	return err;
 }
 
-int ptask_cab_getmes(ptask_cab_t *ptask_cab, void* buffer[],
+int ptask_cab_getmes(ptask_cab_t *ptask_cab, const void* buffer[],
 	ptask_cab_id_t *b_id, struct timespec *timestamp)
 {
 int err = 0;

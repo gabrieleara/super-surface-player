@@ -420,7 +420,7 @@ int i;
 
 	// For each pixel of the plot
 	for (pixel_offset = 0; pixel_offset < FFT_PLOT_WIDTH; ++pixel_offset) {
-		window_end	+= frame_window_per_pixel;
+		window_end		+= frame_window_per_pixel;
 
 		first_weight	= 1. - last_weight;
 		last_weight		= window_end - floor(window_end);
@@ -439,10 +439,6 @@ int i;
 		// Compute average, sum of weights is the frame_window_per_pixel value
 		average /= frame_window_per_pixel;
 
-		// double watch0 = first_weight + last_weight 	+ last_index - first_index - 1;
-		// double watch1 = frame_window_per_pixel;
-		// double watch2 = watch0 - watch1;
-
 		// Compute the height of the pixel column and plot it
 		average = fft_average_to_height(average);
 
@@ -452,8 +448,6 @@ int i;
 				 FFT_PLOT_X		+ pixel_offset + 1,
 				 FFT_PLOT_MY	- 1,
 				 COLOR_ACCENT);
-
-		// window_begin = window_end;
 	}
 }
 
@@ -464,7 +458,7 @@ static inline void draw_fft()
 {
 int buffer_index;		// The index of the fft buffer from the cab, used to
 						// release it later
-/*const*/ double *buffer;	// The fft buffer from the cab
+const double *buffer;	// The fft buffer from the cab
 static double amplitudes[AUDIO_DESIRED_HALFCOMPLEX];
 						// The output of the fft is a complex fft, with the
 						// output in half-complex format.
@@ -509,11 +503,11 @@ int rframes;			// Number of frames per audio sample, which is also the
  */
 static inline int compute_last_amplitude()
 {
-int		buffer_dim;		// dimension of the buffer
-int		buffer_index;	// index of the buffer, to release it later
-int		i;
-short*	buffer;			// the buffer containing the last audio sample
-double	amplitude = 0;	// the computed average energy
+double			amplitude = 0;	// The computed average energy
+int				buffer_dim;		// Dimension of the buffer
+int				buffer_index;	// Index of the buffer, to release it later
+const short*	buffer;			// The buffer containing the last audio sample
+int				i;
 
 	// Get last audio input buffer
 	buffer_dim = audio_get_last_record(&buffer, &buffer_index);

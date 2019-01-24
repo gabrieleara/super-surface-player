@@ -957,12 +957,12 @@ void audio_frequency_down(int i)
 }
 
 
-int audio_get_last_record(short* buffer_ptr[], int* buffer_index_ptr)
+int audio_get_last_record(const short* buffer_ptr[], int* buffer_index_ptr)
 {
 int err;
 
 	err = ptask_cab_getmes(&audio_state.record.cab,
-		STATIC_CAST(void**, buffer_ptr),
+		STATIC_CAST(const void**, buffer_ptr),
 		buffer_index_ptr,
 		NULL);
 
@@ -977,14 +977,14 @@ void audio_free_last_record(int buffer_index)
 	ptask_cab_unget(&audio_state.record.cab, buffer_index);
 }
 
-int audio_get_last_fft(double *buffer_ptr[], int *buffer_index_ptr)
+int audio_get_last_fft(const double *buffer_ptr[], int *buffer_index_ptr)
 {
 	int err;
 
 	err = ptask_cab_getmes(&audio_state.fft.cab,
-						   STATIC_CAST(void **, buffer_ptr),
-						   buffer_index_ptr,
-						   NULL);
+		STATIC_CAST(const void **, buffer_ptr),
+		buffer_index_ptr,
+		NULL);
 
 	if (err)
 		return -EAGAIN;
@@ -1107,7 +1107,7 @@ struct timespec new_timestamp;
 						// Timestamp of the new input buffer
 
 int in_buffer_index;	// Index of local buffer used to get microphone data
-short *in_buffer;		// Pointer to local input buffer
+const short *in_buffer;	// Pointer to local input buffer
 
 int out_buffer_index;	// Index of local buffer used to produce fft data
 double *out_buffer;		// Pointer to local output buffer
@@ -1124,9 +1124,9 @@ unsigned int i;			// Index used to copy data
 	while (!main_get_tasks_terminate())
 	{
 		err = ptask_cab_getmes(&audio_state.record.cab,
-						STATIC_CAST(void **, &in_buffer),
-						&in_buffer_index,
-						&new_timestamp);
+				STATIC_CAST(const void **, &in_buffer),
+				&in_buffer_index,
+				&new_timestamp);
 
 		// If the acquired buffer has not been analyzed yet
 		if (err != EAGAIN && time_cmp(last_timestamp, new_timestamp) < 0)

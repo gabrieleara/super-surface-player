@@ -466,7 +466,7 @@ extern int ptask_cab_putmes(ptask_cab_t *ptask_cab, ptask_cab_id_t b_id);
  * NOTICE: Attempting to reserve a buffer using a non already initialized cab
  * results in undefined behavior.
  */
-extern int ptask_cab_getmes(ptask_cab_t *ptask_cab, void* buffer[],
+extern int ptask_cab_getmes(ptask_cab_t *ptask_cab, const void* buffer[],
 	ptask_cab_id_t *b_id, struct timespec *timestamp);
 
 /**
