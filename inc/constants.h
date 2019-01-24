@@ -22,6 +22,11 @@
 //                           RECORDING CONSTANTS
 // -----------------------------------------------------------------------------
 
+/**
+ * @name Recording-related constants
+ */
+//@{
+
 #define AUDIO_DESIRED_RATE		(44100)	///< Desired acquisition rate (Hz)
 
 #define AUDIO_DESIRED_FRAMES	(4096)
@@ -62,6 +67,14 @@
 //                           GRAPHIC CONSTANTS
 // -----------------------------------------------------------------------------
 
+//@}
+
+/**
+ * @name Color palette
+ */
+//@{
+
+
 //-------------------------------------------------------------
 // Colors
 //-------------------------------------------------------------
@@ -83,6 +96,14 @@
 // Window dimensions
 //-------------------------------------------------------------
 
+//@}
+
+/**
+ * @name Window properties
+ */
+//@{
+
+
 // NOTICE: MX/MY values are considered outside the box
 
 #define WIN_X		(0)				///< Start of coordinates x
@@ -101,6 +122,14 @@
 // The Footer will contain some messages printed by the program
 // IDEA: change this with some commands
 //-------------------------------------------------------------
+
+//@}
+
+/**
+ * @name Footer properties
+ */
+//@{
+
 
 #define FOOTER_WIDTH	(WIN_WIDTH)	///< Footer width
 #define FOOTER_HEIGHT	(48)		///< Footer height
@@ -125,9 +154,16 @@
 	|___________________________________________|______________|
 	|__________________________________________________________|
 
-	The side panel contains the list of all the files opened by the program,
-	TODO: colors will provide informations when a file is executing.
+	The side panel contains the list of all the files opened by the program.
+	IDEA: Colors will provide an indication whether a file is currently in execution.
 */
+
+//@}
+
+/**
+ * @name Side panel properties
+ */
+//@{
 
 #define SIDE_X		(WIN_MX * 7/10)		///< Side panel position x
 #define SIDE_Y		(0)					///< Side panel position y
@@ -151,14 +187,12 @@
 #define SIDE_ELEM_MY	(SIDE_ELEM_X + SIDE_ELEM_HEIGHT)
 											///< Side panel element max y
 
-// TODO: document next constants
-
 #define SIDE_ELEM_NAME_X	(SIDE_ELEM_X + 12)
 											///< Side panel element name label
 											///< absolute x (same for each element)
 #define SIDE_ELEM_NAME_Y	(20)			///< Side panel element name label relative y
 
-#define SIDE_ELEM_VOL_LABEL_X	(12)		///< Side panel element volume label x (TODO: relative?)
+#define SIDE_ELEM_VOL_LABEL_X	(12)		///< Side panel element volume label relative x
 #define SIDE_ELEM_VOL_LABEL_Y	(40)		///< Side panel element volume label relative y
 #define SIDE_ELEM_PAN_LABEL_X	(12+128)	///< Side panel element panning label relative x
 #define SIDE_ELEM_PAN_LABEL_Y	(40)		///< Side panel element panning label relative y
@@ -206,7 +240,7 @@
 
 /// Checks whether the given position is inside the given button y boundaries.
 /// Example usage:
-/// \begincode
+/// \code
 /// // To check if the button is on the same y position of the play button
 /// CHECK_BUTTON_POSY(relative_mouse_y_pos, PLAY)
 /// \endcode
@@ -215,7 +249,7 @@
 
 /// Checks whether the given position is inside the given button x boundaries.
 /// Example usage:
-/// \begincode
+/// \code
 /// // To check if the button is on the same x position of the play button
 /// CHECK_BUTTON_POSX(relative_mouse_x_pos, PLAY)
 /// \endcode
@@ -237,14 +271,17 @@
 	|___________________________________________|______________|
 	|__________________________________________________________|
 
-	// TODO: check this description
-
-	The fft panel contains the fft of the sound received from the recorder.
+	The FFT panel contains the FFT of the sound received from the recorder.
 	The scale and background are contained in a bitmap file, thus they are
-	static.
-	The only thing drawn by the program dynamically is the fft graph, so the
-	dimensions specified here are the borders of the graph.
+	static. TODO: scale and backround.
 */
+
+//@}
+
+/**
+ * @name FFT panel properties
+ */
+//@{
 
 #define FFT_P		(PADDING * 2)			///< FFT panel padding
 #define FFT_X		(WIN_X + FFT_P)			///< FFT panel position x
@@ -285,7 +322,13 @@
 	dimensions specified here are the borders of the plot.
 */
 
-// TODO: change comments
+//@}
+
+/**
+ * @name Time panel properties
+ */
+//@{
+
 #define TIME_P	(PADDING*2)				///< Time panel padding
 #define TIME_X	(0)						///< Time panel position x
 #define TIME_Y	(FOOTER_Y/2 + TIME_P)	///< Time panel position y
@@ -316,6 +359,13 @@
 //-------------------------------------------------------------
 // TASKS CONSTANTS
 //-------------------------------------------------------------
+
+//@}
+
+/**
+ * @name Tasks properties
+ */
+//@{
 
 // The tasks are: gui, user interaction, microphone, fft and analysis.
 #define TASK_GUI	(0)
@@ -369,5 +419,6 @@
 
 // TODO: Define characteristics of each ANALYSIS TASK
 
+//@}
 
 #endif

@@ -24,40 +24,40 @@
 //-------------------------------------------------------------
 
 static const ptask_t _ptask_new_task;
-									// Used to initialize new struct __PTASK
+									///< Used to initialize new struct __PTASK
 
-static char _used_ids[PTASK_MAX];	// Stores for each id if it is in use or not
-static int _ntasks = 0;				// Number of currently initialized ptasks
+static char _used_ids[PTASK_MAX];	///< Stores for each id if it is in use or not
+static int _ntasks = 0;				///< Number of currently initialized ptasks
 
-static int _last_task_id = -1;		// Used to assign the id to the next
-									// ptask, a negative value is invalid
+static int _last_task_id = -1;		///< Used to assign the id to the next
+									///< ptask, a negative value is invalid
 
-static int _scheduler = SCHED_OTHER;// The scheduler that needs to be used
-									// with the ptasks created
+static int _scheduler = SCHED_OTHER;///< The scheduler that needs to be used
+									///< with the ptasks created
 
 //-------------------------------------------------------------
 // LIBRARY PRIVATE UTILITY FUNCTIONS
 //-------------------------------------------------------------
 
-/*!
-	Returns true if the given ptask has a valid id.
-*/
+/**
+ * Returns true if the given ptask has a valid id.
+ */
 static inline bool _ptask_isvalid_id(ptask_t *ptask)
 {
 	return ptask->id >= 0 && ptask->id < PTASK_MAX && _used_ids[ptask->id];
 }
 
-/*!
-	Returns true if a new ptask can be allocated.
-*/
+/**
+ * Returns true if a new ptask can be allocated.
+ */
 static inline bool _ptask_canallocate()
 {
 	return _ntasks < PTASK_MAX;
 }
 
-/*!
-	Assigns the next free id to the new task, returning the allocated id.
-*/
+/**
+ * Assigns the next free id to the new task, returning the allocated id.
+ */
 static inline int _ptask_new_id()
 {
 	if(!_ptask_canallocate())
@@ -74,9 +74,9 @@ static inline int _ptask_new_id()
 	return _last_task_id;
 }
 
-/*!
-	Releases a task identifier, so that it can be used again later.
-*/
+/**
+ * Releases a task identifier, so that it can be used again later.
+ */
 static inline void _ptask_free_id(ptask_t *ptask)
 {
 	if(_ptask_isvalid_id(ptask))
@@ -86,56 +86,55 @@ static inline void _ptask_free_id(ptask_t *ptask)
 	}
 }
 
-/*!
-	Returns true if the ptask is in the state s, regardless of its id value.
-*/
+/**
+ * Returns true if the ptask is in the state s, regardless of its id value.
+ */
 static inline bool _ptask_check_state(ptask_t *ptask, ptask_state_t s)
 {
 	return ptask->_state == s;
 }
 
-/*!
-	Returns true if the task has a valid id and its state is different from
-	PS_FREE.
-*/
+/**
+ * Returns true if the task has a valid id and its state is different from
+ * PS_FREE.
+ */
 static inline bool _ptask_isvalid(ptask_t *ptask)
 {
 	return _ptask_isvalid_id(ptask) &&
 		!_ptask_check_state(ptask, PS_FREE);
 }
 
-/*!
-	Returns true if the ptask is an empty structure that can be overwritten.
-*/
+/**
+ * Returns true if the ptask is an empty structure that can be overwritten.
+ */
 static inline bool _ptask_isnew(ptask_t *ptask)
 {
 	return _ptask_isvalid_id(ptask) &&
 		_ptask_check_state(ptask, PS_NEW);
 }
 
-/*!
-	Returns true if the ptask is valid and it is in the PS_JOINABLE state.
-*/
+/**
+ * Returns true if the ptask is valid and it is in the PS_JOINABLE state.
+ */
 static inline bool _ptask_isjoinable(ptask_t *ptask)
 {
 	return _ptask_isvalid_id(ptask) &&
 		_ptask_check_state(ptask, PS_JOINABLE);
 }
 
-/*!
-	Returns true if the ptask is valid but its state is equal to PS_ERROR.
-*/
+/**
+ * Returns true if the ptask is valid but its state is equal to PS_ERROR.
+ */
 static inline bool _ptask_iserror(ptask_t *ptask)
 {
 	return _ptask_isvalid_id(ptask) &&
 		_ptask_check_state(ptask, PS_ERROR);
 }
 
-/*!
-	Initializes the _attr field of the given ptask.
-
-	Returns a zero value on success, a non zero value otherwise.
-*/
+/**
+ * Initializes the `_attr` field of the given ptask.
+ * Returns a zero value on success, a non zero value otherwise.
+ */
 static inline int _ptask_attr_init(ptask_t *ptask)
 {
 struct sched_param mypar;		// structure used to set the scheduling priority
@@ -371,10 +370,11 @@ int ptask_get_dmiss(ptask_t *ptask)
 // MUTEXES AND CONDITION VARIABLES
 //-------------------------------------------------------------
 
-static pthread_mutexattr_t _matt;
+static pthread_mutexattr_t _matt;	///< Attributes used to initialize any
+									///< mutex allocated in the system
 static pthread_once_t _once_mutex_attr;
-									// Used to initialize all the mutexes in the
-									// program
+									///< Handles whether the _matt variable is
+									///< already initialized or not
 
 /**
  * Executed once per program on the first mutex init, it initializes the mutex
@@ -431,11 +431,12 @@ int ptask_cond_broadcast(ptask_cond_t *cond_p)
 //-------------------------------------------------------------
 
 static const struct __PTASK_CAB _ptask_new_cab;
-									// Used to initialize new struct __PTASK_CAB
+									///< Used to initialize each struct
+									///< __PTASK_CAB to default values
 
-static int _next_cab_id = 1;		// Used to assign the id to the next new
-									// cab, a zero or negative value is
-									// invalid
+static int _next_cab_id = 1;		///< Used to assign the id to the next new
+									///< cab, a zero or negative value is
+									///< invalid
 
 // NOTICE: no need to keep trace of used ids since a cab cannot be destroyed.
 // Instead, cabs should be reused and reinitialized (using the reset function).
@@ -446,11 +447,13 @@ static int _next_cab_id = 1;		// Used to assign the id to the next new
 // until all the currently used buffers have been freed. Only when no buffers
 // inside the cab are used anymore the cab could be destroyed.
 
+/// Returns true if a new cab structure can be allocated
 static inline int _ptask_cab_canallocate()
 {
 	return _next_cab_id <= PTASK_CAB_MAX;
 }
 
+/// Allocates a new cab id
 static inline int _ptask_cab_next_id()
 {
 	return _next_cab_id++;

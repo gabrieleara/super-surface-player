@@ -135,6 +135,7 @@ ptask_join(task0);
 // DEFINES AND DATA TYPES
 //-------------------------------------------------------------
 
+/// The maximum number of tasks that can be allocated at any time
 #define PTASK_MAX	(50)
 
 /**
@@ -178,9 +179,11 @@ typedef pthread_mutex_t ptask_mutex_t;
 /// Alias of phtread_cond_t
 typedef pthread_cond_t ptask_cond_t;
 
+/// The maximum number of cab structures that can be allocated in a process
+#define PTASK_CAB_MAX		(50)
 
-#define PTASK_CAB_MAX		(50)	// maximum number of cabs per process
-#define PTASK_CAB_MAX_SIZE	(10)	// maximum number of buffers inside a cab
+/// The maximum number of buffers within a cab structure
+#define PTASK_CAB_MAX_SIZE	(32)
 
 /**
  * The structure representing a CAB
@@ -263,7 +266,7 @@ extern int ptask_set_params(ptask_t *ptask, long wcet, int period, int deadline,
  * the given body function.
  * Returns 0 on success, a non zero value otherwise.
  */
-extern int ptask_create(ptask_t *ptask, ptask_body_t body);
+extern int ptask_create(ptask_t *ptask, ptask_body_t *body);
 
 /**
  * Destroys a previously initialied ptask but only if the ptask_create
@@ -277,7 +280,7 @@ extern int ptask_destroy(ptask_t *ptask);
  * Returns 0 on success, a non zero value otherwise.
  */
 extern int ptask_short(ptask_t *ptask,
-	long wcet, int period, int deadline, int priority, ptask_body_t body);
+	long wcet, int period, int deadline, int priority, ptask_body_t *body);
 
 /**
  * Cancels a previously started ptask, if it is still running.
