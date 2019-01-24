@@ -415,7 +415,7 @@ int err;
 						STATIC_CAST(void *, buffer),
 						nframes);
 
-	// NOTE: This assumes no recovery code is available to be executed from
+	// NOTICE: This assumes no recovery code is available to be executed from
 	// erroneus states. See mic_read_blocking.
 #ifdef NDEBUG
 	if (err < 0 && err != -EAGAIN)
@@ -442,84 +442,6 @@ static inline void timed_wait(int ms)
 	while(clock_nanosleep(CLOCK_MONOTONIC, 0, &req, NULL))
 		;
 }
-
-/**
- * Reads microphone data if available, blocking until the number of frames that
- * is requested is not available yet.
- * TODO: add more to this documentation if the function is actually used.
- * TODO: actually probably this function will be used while in single-thread text mode.
-*/
-/*
-static inline void mic_read_blocking(short* buffer, const int nframes)
-{
-int err;
-int how_many_read = 0;	// How many frames have already been read
-int missing = nframes;	// How many frames are still missing
-
-	while (missing > 0)
-	{
-		err = mic_read(buffer + how_many_read, missing);
-
-		if (err < 0)
-		{
-			switch (err)
-			{
-			case -EBADFD:
-#ifdef NDEBUG
-				abort_on_error("ALSA device was not in correct state.");
-#else
-				fprintf(stderr,
-						"ALSA device was not in correct state: %s.\r\n",
-						snd_strerror(err));
-				assert(false);
-#endif
-				break;
-			case -EPIPE:
-#ifdef NDEBUG
-				abort_on_error("Overrun in ALSA microphone handling.");
-#else
-				// NOTE: Could implement a recovery code from this state.
-				fprintf(stderr, "ALSA overrun: %s.\r\n", snd_strerror(err));
-				assert(false);
-#endif
-				break;
-			case -ESTRPIPE:
-#ifdef NDEBUG
-				abort_on_error("ALSA suspend event occurred.");
-#else
-				// NOTE: Could implement a recovery code from this state.
-				fprintf(stderr, "WARN: ALSA suspend event: %s.\r\n", snd_strerror(err));
-				assert(false);
-#endif
-				break;
-			case -EAGAIN:
-				// No big deal, we can suspend for some time
-				break;
-			default:
-#ifndef NDEBUG
-				abort_on_error("ALSA unexpected error in blocking recording!");
-#else
-				fprintf(stderr, "ALSA unexpected error: %s.\r\n", snd_strerror(err));
-				assert(false);
-#endif
-				break;
-			}
-
-#ifndef NDEBUG
-			printf("LOG: missing=%d, delay=%ld (ms).\r\n", missing,
-				FRAMES_TO_MS(missing, audio_state.record.rrate));
-#endif
-
-			timed_wait(FRAMES_TO_MS(missing, audio_state.record.rrate));
-		}
-		else
-		{
-			how_many_read	+= err;
-			missing			-= err;
-		}
-	}
-}
-*/
 
 //@}
 
@@ -731,6 +653,14 @@ int i;
 }
 
 // -------------- GETTERS --------------
+
+int audio_get_rrate() {
+	return audio_state.fft.rrate;
+}
+
+int audio_get_rframes() {
+	return audio_state.fft.rframes;
+}
 
 int audio_get_num_files()
 {
@@ -954,6 +884,7 @@ void audio_frequency_down(int i)
 	ptask_mutex_unlock(&audio_state.mutex);
 }
 
+// -------------- BUFFERS FUNCTIONS --------------
 
 int audio_get_last_record(const short* buffer_ptr[], int* buffer_index_ptr)
 {
@@ -995,13 +926,99 @@ void audio_free_last_fft(int buffer_index)
 	ptask_cab_unget(&audio_state.fft.cab, buffer_index);
 }
 
-int audio_get_rrate() {
-	return audio_state.fft.rrate;
+// -------------- MICROPHONE --------------
+
+/**
+ * Reads microphone data if available, blocking until the number of frames that
+ * is requested is not available yet.
+ * TODO: add more to this documentation if the function is actually used.
+ * TODO: actually probably this function will be used while in single-thread text mode.
+*/
+void mic_read_blocking(short* buffer, const int nframes)
+{
+int err;
+int how_many_read = 0;	// How many frames have already been read
+int missing = nframes;	// How many frames are still missing
+
+	while (missing > 0)
+	{
+		// Non-blocking read
+		err = mic_read(buffer + how_many_read, missing);
+
+		if (err < 0)
+		{
+
+#ifdef NDEBUG
+			// Release mode, program aborts if an error different than -EAGAIN occurs
+			switch (err)
+			{
+			case -EAGAIN:
+				// No big deal, we can suspend for some time
+				// See after the switch block
+				break;
+			case -EBADFD:
+				abort_on_error("ALSA device was not in correct state.");
+				break;
+			case -EPIPE:
+				// NOTICE: Could implement some code to recover from this state
+				abort_on_error("Overrun in ALSA microphone handling.");
+				break;
+			case -ESTRPIPE:
+				// NOTICE: Could implement some code to recover from this state
+				abort_on_error("ALSA suspend event occurred.");
+				break;
+			default:
+				abort_on_error("ALSA unexpected error in blocking recording!");
+				break;
+			}
+#else
+			// Debug mode, program prints some extra information, but aborts anyway
+			switch(err)
+			{
+			case -EAGAIN:
+				// No big deal, we can suspend for some time
+				// See after the switch block
+				break;
+			case -EBADFD:
+				fprintf(stderr,
+						"ALSA device was not in correct state: %s.\r\n",
+						snd_strerror(err));
+				assert(false);
+
+				break;
+			case -EPIPE:
+				// NOTICE: Could implement some code to recover from this state
+				fprintf(stderr, "ALSA overrun: %s.\r\n", snd_strerror(err));
+				assert(false);
+
+				break;
+			case -ESTRPIPE:
+				// NOTICE: Could implement some code to recover from this state
+				fprintf(stderr, "WARN: ALSA suspend event: %s.\r\n", snd_strerror(err));
+				assert(false);
+
+				break;
+			default:
+				fprintf(stderr, "ALSA unexpected error: %s.\r\n", snd_strerror(err));
+				assert(false);
+				break;
+			}
+
+			printf("LOG: missing=%d, delay=%ld (ms).\r\n", missing,
+				FRAMES_TO_MS(missing, audio_state.record.rrate));
+#endif
+
+			// The delay is an estimation based on the number of missing frames
+			timed_wait(FRAMES_TO_MS(missing, audio_state.record.rrate));
+		}
+		else
+		{
+			how_many_read	+= err;
+			missing			-= err;
+		}
+	}
 }
 
-int audio_get_rframes() {
-	return audio_state.fft.rframes;
-}
 
 // -----------------------------------------------------------------------------
 //                                  TASKS
@@ -1048,7 +1065,7 @@ int		missing;		// How many frames are missing
 		// While there is new data, keep capturing.
 		// NOTICE: This is NOT an infinite loop, because the code is many times
 		// faster than I/O.
-		// NOTE: Change with an maximum time limit if this is a problem.
+		// NOTE: Change with a maximum time limit if this is a problem.
 		while ((err = mic_read(buffer + how_many_read, missing)) > 0) {
 			how_many_read	+= err;
 			missing			-= err;
