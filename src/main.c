@@ -399,6 +399,53 @@ int err;
 	}
 }
 
+static inline void cmd_record(int fnum)
+{
+char buffer[MAX_CHAR_BUFFER_SIZE];	// Buffer containing the inserted values
+char *token;
+bool answer = false;
+bool yes = false;
+
+	while(!answer) {
+		printf("\r\nThe program will now prepare to record a new sample for "
+		"file number %d.\r\n"
+		"This will override any previously recorded sample associated with said "
+		"audio file, are you sure? [y/n] ",
+		fnum);
+
+		fgets(buffer, sizeof(buffer), stdin);
+		token = strtok(buffer, "\n");
+
+		if (token == NULL)
+		{
+			// Do nothing
+		} else if (strcmp(token, "y") == 0 || strcmp(token, "yes") == 0) {
+			answer = true;
+			yes = true;
+		} else if (strcmp(token, "n") == 0 || strcmp(token, "no") == 0) {
+			answer = true;
+			yes = false;
+
+			printf("Aborted.\r\n");
+		} else {
+			printf("Please, answer either \"yes\" or \"no\".\r\n");
+		}
+	}
+
+	if (!yes) return;
+
+	printf("You choose to record a new entry, the program will start recording after exactly 5 seconds after your next input.\r\n"
+		"Press ENTER to continue..."
+	);
+
+	fgets(buffer, sizeof(buffer), stdin);
+
+	// TODO: RECORD!
+
+	printf("Recorded!\r\n");
+
+}
+
 /**
  * Implements the main loop that is executed whenever the program is in text
  * mode.
@@ -488,8 +535,13 @@ int err;
 		}
 		else if (strcmp(command, "record") == 0)
 		{
-			// TODO: This command should be used to associate a recording to
-			// an opened file id.
+			// Convert second argument to a number
+			err = sscanf(argument, "%d", &fnum);
+
+			if (err < 1)
+				printf("Invalid command. Missing file number.\r\n");
+			else
+				cmd_record(fnum);
 		}
 		else
 		{
