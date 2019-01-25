@@ -102,6 +102,11 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 								///< recorded audio that can be recognized to
 								///< start it playing
 
+	short recorded_sample[AUDIO_DESIRED_FRAMES];
+								///< Contains the recorded sample by the user
+								///< to play the audio file whenever a sample
+								///< similar to the recorded one is detected
+
 	// TODO: How should I define an association between an audio file and the
 	// audio record that should be used to associate it with another file?
 } audio_file_desc_t;
@@ -293,6 +298,8 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	if (err < 0) return err;
 
 	// Freeing up local resources allocated via malloc
+	// NOTICE: on failure the program aborts, so there is no need to free them
+	// each time a call fails
 	snd_pcm_hw_params_free(hw_params);
 
 	// Copying into INOUT parameters
@@ -403,6 +410,17 @@ static inline int mic_prepare()
 }
 
 /**
+ * Stops the microphone, dropping immediately any buffered frame.
+ * It is used when it's sure that no further frame will be needed from now
+ * until the next prepare.
+ * TODO: check what are the return values.
+ */
+static inline int mic_stop()
+{
+	return snd_pcm_drop(audio_state.record.alsa_handle);
+}
+
+/**
  * Reads microphone data if available, microphone is non-blocking so this call
  * returns immediately with the number of read frames. Returns 0 if there were
  * no frame to read, less than zero on error.
@@ -426,19 +444,30 @@ int err;
 }
 
 /**
- * Waits for a specified amount of ms. It may wait for less time if the thread
- * is interrupted from outside.
+ * Waits for a specified amount of ms.
+ * If interrupted the wait is resumed with the remaining time, thus this
+ * function always waits for the specified amount of ms.
  */
 static inline void timed_wait(int ms)
 {
+int s = 0;
+
 	if (ms < 1)
 		return;
 
+	if (ms >= 1000) {
+		s = ms / 1000;
+		ms = ms % 1000;
+	}
+
 	const struct timespec req = {
-		.tv_sec = 0,
+		.tv_sec = s,
 		.tv_nsec = ms * 1000000L,
 	};
 
+	// The nanosleep updates req with the remaining time if interrupted, thus
+	// even if interrupted the call waits always for the given amount of ms
+	// before terminating.
 	while(clock_nanosleep(CLOCK_MONOTONIC, 0, &req, NULL))
 		;
 }
@@ -535,11 +564,16 @@ int				index;			// Index of newly used audio file descriptor
 	return file_pointer.gen_p ? 0 : EINVAL;
 }
 
+bool audio_is_file_open(int i)
+{
+	return i >= 0 && i < audio_state.opened_audio_files;
+}
+
 int audio_close_file(int filenum)
 {
 int err = 0;
 
-	if (filenum >= 0 && filenum < audio_state.opened_audio_files)
+	if (audio_is_file_open(filenum))
 	{
 		switch (audio_state.audio_files[filenum].type)
 		{
@@ -582,8 +616,14 @@ int i;
 	{
 		for(i = 0; i < audio_state.opened_audio_files; ++i)
 		{
-			printf("%d. %s\r\n", i+1, audio_state.audio_files[i].filename);
+			printf("\t%d. %s", i+1, audio_state.audio_files[i].filename);
+
+			if (audio_state.audio_files[i].has_rec)
+				printf(" *");
+
+			printf("\r\n");
 		}
+		printf("\r\nFiles with a * have an associated recorded sample.\r\n\r\n");
 	}
 }
 
@@ -931,10 +971,11 @@ void audio_free_last_fft(int buffer_index)
 /**
  * Reads microphone data if available, blocking until the number of frames that
  * is requested is not available yet.
+ * It returns zero on success, a non zero value on failure.
  * TODO: add more to this documentation if the function is actually used.
  * TODO: actually probably this function will be used while in single-thread text mode.
 */
-void mic_read_blocking(short* buffer, const int nframes)
+static inline int mic_read_blocking(short* buffer, const int nframes)
 {
 int err;
 int how_many_read = 0;	// How many frames have already been read
@@ -949,7 +990,8 @@ int missing = nframes;	// How many frames are still missing
 		{
 
 #ifdef NDEBUG
-			// Release mode, program aborts if an error different than -EAGAIN occurs
+			// Release mode, function returns with an error if an error
+			// different than -EAGAIN occurs
 			switch (err)
 			{
 			case -EAGAIN:
@@ -957,22 +999,23 @@ int missing = nframes;	// How many frames are still missing
 				// See after the switch block
 				break;
 			case -EBADFD:
-				abort_on_error("ALSA device was not in correct state.");
-				break;
+				fprintf(stderr, "ALSA device was not in correct state.");
+				return err;
 			case -EPIPE:
 				// NOTICE: Could implement some code to recover from this state
-				abort_on_error("Overrun in ALSA microphone handling.");
-				break;
+				fprintf(stderr, "Overrun in ALSA microphone handling.");
+				return err;
 			case -ESTRPIPE:
 				// NOTICE: Could implement some code to recover from this state
-				abort_on_error("ALSA suspend event occurred.");
-				break;
+				fprintf(stderr, "ALSA suspend event occurred.");
+				return err;
 			default:
-				abort_on_error("ALSA unexpected error in blocking recording!");
-				break;
+				fprintf(stderr, "ALSA unexpected error in blocking recording!");
+				return err;
 			}
 #else
-			// Debug mode, program prints some extra information, but aborts anyway
+			// Debug mode, program prints some extra information, but aborts
+			// if an error occurs
 			switch(err)
 			{
 			case -EAGAIN:
@@ -1001,6 +1044,7 @@ int missing = nframes;	// How many frames are still missing
 			default:
 				fprintf(stderr, "ALSA unexpected error: %s.\r\n", snd_strerror(err));
 				assert(false);
+
 				break;
 			}
 
@@ -1017,6 +1061,67 @@ int missing = nframes;	// How many frames are still missing
 			missing			-= err;
 		}
 	}
+
+	return 0;
+}
+
+/**
+ * Waits for the given amount of seconds, printing a countdown on the standard
+ * output every second, followed by an exclamation mark when the countdown is
+ * finished.
+ */
+static inline void wait_seconds_print(int nseconds)
+{
+	for (; nseconds > 0; --nseconds)
+	{
+		printf("%d . . . ", nseconds);
+		fflush(stdout);
+		timed_wait(1000);
+	}
+	printf("!\r\n");
+}
+
+void record_sample_to_play(int i)
+{
+short *buffer;
+
+	// We record directly in the associated sample, this is just for convenience
+	buffer = audio_state.audio_files[i].recorded_sample;
+
+	// Since we overwrite the previous one, we mark temprarily that this file
+	// has no sample associated with it
+	audio_state.audio_files[i].has_rec = false;
+
+	// TODO: constant
+	wait_seconds_print(5);
+
+	// Preparing the microphone interface to be used
+	int err = mic_prepare();
+	if (err)
+		abort_on_error("Could not prepare microphone acquisition.");
+
+	err = mic_read_blocking(buffer, audio_state.record.rframes);
+	// TODO: check return values
+	if (err)
+		// TODO: do not abort
+		abort_on_error("Could not record properly the trigger sample!");
+	else
+		audio_state.audio_files[i].has_rec = true;
+
+	// Stop recording
+	err = mic_stop();
+	if (err)
+		abort_on_error("Could not stop properly the microphone acquisition.");
+}
+
+void play_recorded_sample(int i)
+{
+	// TODO: this function
+}
+
+void discard_recorded_sample(int i)
+{
+	audio_state.audio_files[i].has_rec = false;
 }
 
 
@@ -1095,6 +1200,12 @@ int		missing;		// How many frames are missing
 	}
 
 	// Cleanup
+	// Stop recording
+	err = mic_stop();
+	if (err)
+		abort_on_error("Could not stop properly the microphone acquisition.");
+
+
 	// Releasing unused half-empty buffer, this is needed because the reset does
 	// not release any buffer that was previously reserved
 	ptask_cab_unget(&audio_state.record.cab, buffer_index);

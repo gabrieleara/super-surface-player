@@ -399,7 +399,14 @@ int err;
 	}
 }
 
-static inline void cmd_record(int fnum)
+static inline void wait_enter()
+{
+char buffer[MAX_CHAR_BUFFER_SIZE];
+	printf("Press ENTER to continue...");
+	fgets(buffer, sizeof(buffer), stdin);
+}
+
+static inline bool ask_yes_no(char* query)
 {
 char buffer[MAX_CHAR_BUFFER_SIZE];	// Buffer containing the inserted values
 char *token;
@@ -407,43 +414,83 @@ bool answer = false;
 bool yes = false;
 
 	while(!answer) {
-		printf("\r\nThe program will now prepare to record a new sample for "
-		"file number %d.\r\n"
-		"This will override any previously recorded sample associated with said "
-		"audio file, are you sure? [y/n] ",
-		fnum);
+		printf("%s [y/n] ", query);
 
 		fgets(buffer, sizeof(buffer), stdin);
-		token = strtok(buffer, "\n");
+		token = strtok(buffer, "\r\n");
 
 		if (token == NULL)
 		{
-			// Do nothing
+			// Do nothing, reask
 		} else if (strcmp(token, "y") == 0 || strcmp(token, "yes") == 0) {
 			answer = true;
 			yes = true;
 		} else if (strcmp(token, "n") == 0 || strcmp(token, "no") == 0) {
 			answer = true;
 			yes = false;
-
-			printf("Aborted.\r\n");
 		} else {
 			printf("Please, answer either \"yes\" or \"no\".\r\n");
 		}
 	}
 
-	if (!yes) return;
+	return yes;
+}
 
-	printf("You choose to record a new entry, the program will start recording after exactly 5 seconds after your next input.\r\n"
-		"Press ENTER to continue..."
-	);
+static inline void cmd_record(int fnum)
+{
+bool yes		= false;
+bool accepted	= false;
+bool again		= true;
 
-	fgets(buffer, sizeof(buffer), stdin);
+	if (!audio_is_file_open(fnum-1))
+	{
+		printf("A wrong file number has been specified. Aborted.\r\n");
+		return;
+	}
 
-	// TODO: RECORD!
+	printf("\r\nThe program will now prepare to record a new sample for "
+		"file number %d.\r\n", fnum);
 
-	printf("Recorded!\r\n");
+	yes = ask_yes_no("This will override any previously recorded sample "
+		"associated with said audio file, are you sure?");
 
+	if (!yes)
+	{
+		printf("Aborted!\r\n");
+		return;
+	}
+
+	while(!accepted && again) {
+		printf("You choose to record a new entry, the program will start recording after exactly 5 seconds after your next input.\r\n");
+
+		wait_enter();
+		printf("\r\n");
+
+		record_sample_to_play(fnum-1);
+
+		printf("Recorded!\r\nThe recorded sample will now be played.\r\n");
+
+		wait_enter();
+		printf("\r\n");
+		play_recorded_sample(fnum-1);
+
+		accepted = ask_yes_no("Are you satisfied with this sample?");
+
+		if (!accepted) {
+			again = ask_yes_no("Do you wish to record another sample? "
+				"If you answer no the recorded sample will be discarded.");
+
+			if (!again)
+			{
+				discard_recorded_sample(fnum-1);
+				printf("Discarded!\r\n");
+			}
+		}
+		else
+		{
+			printf("Sample accepted!\r\n");
+		}
+	}
 }
 
 /**

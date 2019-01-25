@@ -197,6 +197,18 @@ extern int audio_get_rrate();
  */
 extern int audio_get_rframes();
 
+// TODO: documentation
+
+extern void record_sample_to_play(int i);
+
+extern void play_recorded_sample(int i);
+
+extern void discard_recorded_sample(int i);
+
+extern bool audio_is_file_open(int i);
+
+
+
 //@}
 
 // -----------------------------------------------------------------------------
