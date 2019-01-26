@@ -168,6 +168,7 @@ int err = 0;
 	switch (c)
 	{
 	// NOTE: Even if it is implemented, the verbose command does actually nothing
+	// NOTE: Even if it is implemented, the wcet_analysis command does actually nothing
 	case 'v':
 #ifdef NDEBUG
 		if(main_state.verbose)

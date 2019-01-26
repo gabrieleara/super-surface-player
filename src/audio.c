@@ -62,6 +62,10 @@
 								///< The maximum length of the audio file
 								///< base name
 
+#define COUNTDOWN_SECONDS	5
+								///< The number of seconds to wait before
+								///< recording an audio sample
+
 
 // -----------------------------------------------------------------------------
 //                           PRIVATE DATA TYPES
@@ -675,9 +679,6 @@ int err = 0;
 			assert(false);
 		}
 
-		// NOTE: Depending on how files are associated with recorded trigger
-		// samples, handle the removal of such triggers as well
-
 		--audio_state.opened_audio_files;
 
 		// Shift back array, starting from position of filenum
@@ -1191,8 +1192,7 @@ short *buffer;
 	// has no sample associated with it
 	audio_state.audio_files[i].has_rec = false;
 
-	// TODO: constant
-	wait_seconds_print(5);
+	wait_seconds_print(COUNTDOWN_SECONDS);
 
 	// Preparing the microphone interface to be used
 	int err = mic_prepare();
@@ -1225,6 +1225,12 @@ short *buffer;
 	return 0;
 }
 
+/**
+ * Play the given buffer on the default alsa playback handle, waiting for its
+ * completion too.
+ * The handle needs to be prepared first.
+ * Returns zero on success, a non-zero value otherwise.
+ */
 static inline int playback_buffer_blocking(short* buffer)
 {
 int remaining = audio_state.record.rframes;
