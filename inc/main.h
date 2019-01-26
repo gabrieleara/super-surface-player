@@ -20,6 +20,22 @@
 // -----------------------------------------------------------------------------
 
 /**
+ * Returns true if the verbose flag is set.
+ */
+extern bool verbose();
+
+/**
+ * Returns true if the wcet_analysis flag is set.
+ */
+extern bool wcet_analysis();
+
+/**
+ * Returns the path of the current working directory.
+ */
+extern char* working_directory();
+
+
+/**
  * Forcefully closes the program after displaying an error message.
  * Use only as last resource.
  */

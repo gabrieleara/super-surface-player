@@ -29,7 +29,8 @@
 
 #define AUDIO_DESIRED_RATE		(44100)	///< Desired acquisition rate (Hz)
 
-#define AUDIO_DESIRED_FRAMES	(4096)
+// TODO: explain magic numbers
+#define AUDIO_DESIRED_FRAMES	(13*1024) // FIXME: (around 0.3 seconds)
 										///< Desired acquisition buffer dimension.
 										///< NOTICE: that the bigger this is,
 										///< the bigger the latency of the system

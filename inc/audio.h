@@ -40,6 +40,8 @@ typedef enum __AUDIO_TYPE_ENUM
  */
 //@{
 
+// TODO: rename functions
+
 /**
  * Initializes the audio module.
  */
@@ -50,6 +52,11 @@ extern int audio_init();
  * The filename shall be the complete absolute path of the file.
  */
 extern int audio_open_file(const char *filename);
+
+/**
+ * Returns true if the specified audio file is open.
+ */
+extern bool audio_is_file_open(int i);
 
 /**
  * Closes an opened audio file and shifts all the indexes of opened audio files
@@ -197,16 +204,22 @@ extern int audio_get_rrate();
  */
 extern int audio_get_rframes();
 
-// TODO: documentation
+/**
+ * Displays a countdown and then records an audio sample that can be used to
+ * trigger the specified audio file.
+ * Returns zero on success.
+ */
+extern int record_sample_to_play(int i);
 
-extern void record_sample_to_play(int i);
-
+/**
+ * PLays the recorded audio sample associated with the specified file.
+ */
 extern void play_recorded_sample(int i);
 
+/**
+ * Discards the recorded audio sample associated with the specified file.
+ */
 extern void discard_recorded_sample(int i);
-
-extern bool audio_is_file_open(int i);
-
 
 
 //@}

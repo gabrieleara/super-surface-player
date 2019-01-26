@@ -89,8 +89,7 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 	int				frequency;	///< Frequency used when playing this file,
 								///< 1000 is the base frequency
 
-	// IDEA: I decided to not enable loop execution of audio files. If there is
-	// time left consider implementing it.
+	// I decided to not enable loop execution of audio files.
 	// bool loop;				///< Tells if the audio should be reproduced in a loop
 
 	char filename[MAX_AUDIO_NAME_LENGTH];
@@ -106,9 +105,6 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 								///< Contains the recorded sample by the user
 								///< to play the audio file whenever a sample
 								///< similar to the recorded one is detected
-
-	// TODO: How should I define an association between an audio file and the
-	// audio record that should be used to associate it with another file?
 } audio_file_desc_t;
 
 /// Status of the resources used to record audio
@@ -120,7 +116,9 @@ typedef struct __AUDIO_RECORD_STRUCT
 	snd_pcm_uframes_t rframes;	///< Period requested to recorder task,
 								///< expressed in terms of number of frames
 
-	snd_pcm_t *alsa_handle;		///< ALSA Hardware Handle used to record audio
+	snd_pcm_t *record_handle;	///< ALSA Hardware Handle used to record audio
+	snd_pcm_t *playback_handle;	///< ALSA Hardware Handle used to playback
+								///< recorded audio
 
 	short buffers[AUDIO_NUM_BUFFERS][AUDIO_DESIRED_FRAMES];
 								///< Buffers used within the cab
@@ -233,12 +231,12 @@ int		len;
 	strncpy(dest, base_name, MAX_AUDIO_NAME_LENGTH);
 }
 
-/**
- * Initialize ALSA recorder handle.
- * TODO: document arguments
- */
-int alsa_install_recorder(snd_pcm_t **alsa_handle_ptr,
-	unsigned int *rrate_ptr, snd_pcm_uframes_t *rframes_ptr)
+
+int alsa_install_pcm(snd_pcm_t **alsa_handle_ptr,
+	unsigned int *rrate_ptr, snd_pcm_uframes_t *rframes_ptr,
+	snd_pcm_stream_t stream_direction,
+	int mode
+	)
 {
 int err;
 
@@ -252,50 +250,85 @@ snd_pcm_t *alsa_handle;			// ALSA Hardware Handle used to record audio
 snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 
 	// Open PCM device for recording (capture)
-	err = snd_pcm_open(&alsa_handle, "default",
-					SND_PCM_STREAM_CAPTURE, SND_PCM_NONBLOCK);
-	if (err < 0) return err;
+	err = snd_pcm_open(&alsa_handle, "default", stream_direction, mode);
+	if (err < 0)
+	{
+		if (verbose())	printf("Failed to open ALSA PCM default device.\r\n");
+		return err;
+	}
 
 	// Allocate a hardware parameters object
 	err = snd_pcm_hw_params_malloc(&hw_params);
-	if (err < 0) return err;
+	if (err < 0)
+	{
+		if (verbose())	printf("Failed to malloc ALSA params.\r\n");
+		return err;
+	}
 
 	// Fill it with default values
 	err = snd_pcm_hw_params_any(alsa_handle, hw_params);
-	if (err < 0) return err;
+	if (err < 0)
+	{
+		if (verbose())	printf("Failed to fill params with default values.\r\n");
+		return err;
+	}
 
 	// From now on we set desired hardware parameters.
 
-	// Interleaved mode (we'll use only one channel though)
+	// Interleaved mode (we'll use only one channel though, since it's mono)
 	err = snd_pcm_hw_params_set_access(alsa_handle, hw_params,
 									   SND_PCM_ACCESS_RW_INTERLEAVED);
-	if (err < 0) return err;
+	if (err < 0)
+	{
+		if (verbose())	printf("Failed to set interleaved mode on ALSA PCM.\r\n");
+		return err;
+	}
 
 	// Signed 16-bit little-endian format
 	err = snd_pcm_hw_params_set_format(alsa_handle, hw_params,
-									SND_PCM_FORMAT_S16_LE);
-	if (err < 0) return err;
+									   SND_PCM_FORMAT_S16_LE);
+	if (err < 0)
+	{
+		if (verbose())	printf("Failed to set 16bit LE format on ALSA PCM.\r\n");
+		return err;
+	}
 
-	// Settinhg the sampling rate.
+	// Setting the sampling rate.
 	// After this call rrate contains the real rate at which the device will
 	// record
 	err = snd_pcm_hw_params_set_rate_near(alsa_handle, hw_params, &rrate, 0);
-	if (err < 0) return err;
+	if (err < 0)
+	{
+		if (verbose())	printf("Failed to set sampling rate on ALSA PCM.\r\n");
+		return err;
+	}
 
 	// Setting one channel only (mono)
 	err = snd_pcm_hw_params_set_channels(alsa_handle, hw_params, 1);
-	if (err < 0) return err;
+	if (err < 0)
+	{
+		if (verbose())	printf("Failed to set mono channel on ALSA PCM.\r\n");
+		return err;
+	}
 
 	// Setting execution period size based on number of frames of the buffer
 	// After this call, rframes will contain the actual period accepted by the
 	// device
 	err = snd_pcm_hw_params_set_period_size_near(alsa_handle, hw_params,
 												 &rframes, 0);
-	if (err < 0) return err;
+	if (err < 0)
+	{
+		if (verbose())	printf("Failed to set period on ALSA PCM.\r\n");
+		return err;
+	}
 
 	// Writing parameters to the driver
 	err = snd_pcm_hw_params(alsa_handle, hw_params);
-	if (err < 0) return err;
+	if (err < 0)
+	{
+		if (verbose())	printf("Failed to write params to ALSA PCM device.\r\n");
+		return err;
+	}
 
 	// Freeing up local resources allocated via malloc
 	// NOTICE: on failure the program aborts, so there is no need to free them
@@ -311,10 +344,34 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 }
 
 /**
+ * Initialize ALSA recorder handle.
+ * TODO: document arguments
+ */
+int alsa_install_recorder(snd_pcm_t **record_handle_ptr,
+	unsigned int *rrate_ptr, snd_pcm_uframes_t *rframes_ptr)
+{
+	return alsa_install_pcm(record_handle_ptr, rrate_ptr, rframes_ptr,
+		SND_PCM_STREAM_CAPTURE, SND_PCM_NONBLOCK);
+}
+
+/**
+ * Initialize ALSA playback handle.
+ * TODO: document arguments
+ */
+int alsa_install_playback(snd_pcm_t **playback_handle_ptr,
+	unsigned int *rrate_ptr, snd_pcm_uframes_t *rframes_ptr)
+{
+	// The zero indicates the blocking mode
+	return alsa_install_pcm(playback_handle_ptr, rrate_ptr, rframes_ptr,
+		SND_PCM_STREAM_PLAYBACK, 0);
+}
+
+/**
  * Initializes both Allegro sound and ALSA library to record
  */
 static inline int allegro_alsa_sound_init(unsigned int *rrate_ptr,
-	snd_pcm_uframes_t *rframes_ptr, snd_pcm_t **alsa_handle_ptr)
+	snd_pcm_uframes_t *rframes_ptr, snd_pcm_t **record_handle_ptr,
+	snd_pcm_t **playback_handle_ptr)
 {
 int err;
 int index;
@@ -323,13 +380,17 @@ void *cab_pointers[AUDIO_NUM_BUFFERS];
 								// Pointers to buffers used in cab library
 
 	// Allegro sound initialization
-	// FIXME: MIDI files do not work, consider enabling MIDI_AUTODETECT and
+	// IDEA: MIDI files do not work, consider enabling MIDI_AUTODETECT and
 	// implement MIDI files support
 	err = install_sound(DIGI_AUTODETECT, MIDI_NONE, NULL);
 	if (err) return err;
 
 	// Initialization of ALSA recorder
-	err = alsa_install_recorder(alsa_handle_ptr, rrate_ptr, rframes_ptr);
+	err = alsa_install_recorder(record_handle_ptr, rrate_ptr, rframes_ptr);
+	if (err) return err;
+
+	// Initialization of ALSA playback
+	err = alsa_install_playback(playback_handle_ptr, rrate_ptr, rframes_ptr);
 	if (err) return err;
 
 	// Construction of CAB pointers for audio buffers
@@ -362,6 +423,25 @@ void *cab_pointers[AUDIO_NUM_BUFFERS];
 double *inout;					// Array that will be used to create a
 								// FFTW3 plan
 
+char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
+
+	// Getting absolute path for wisdom file location
+	strncpy(wisdom_filepath, working_directory(), MAX_CHAR_BUFFER_SIZE);
+	strncat(wisdom_filepath, "super_wisdom.dat",
+		MAX_CHAR_BUFFER_SIZE - strlen(wisdom_filepath));
+
+	// Wisdom is a way to speed up plan generation for FFTW library.
+	// Wisdom is cumulative, hence each time the rframes value changes for
+	// whatever reason the new wisdom file generated will contain parameters
+	// for both past and current value of rframes variable.
+	err = fftw_import_wisdom_from_filename(wisdom_filepath);
+
+	if (err == 0)
+	{
+		printf("Could not load FFT Wisdom from dat file, "
+			"program initialization will surely take longer...\r\n");
+	}
+
 	// The array is allocated dynamically, but it will be deallocated as soon a
 	// the construction of the plan is finished. It's the only thing that is
 	// allocated dynamically.
@@ -369,12 +449,13 @@ double *inout;					// Array that will be used to create a
 
 	// The returned plan is guaranteed not to be NULL
 	*fft_plan_ptr = fftw_plan_r2r_1d(rframes,
-						 inout,
-						 inout,
-						 FFTW_R2HC,
-						 FFTW_EXHAUSTIVE); // OR FFTW_PATIENT
+									 inout,
+									 inout,
+									 FFTW_R2HC,
+									 FFTW_EXHAUSTIVE); // OR FFTW_PATIENT
 
-	// TODO: Implement wisdom saving/retrieval
+	// Saving back updated wisdom to dat file
+	fftw_export_wisdom_to_filename(wisdom_filepath);
 
 	// From now on we can calculate the FFT using the given plan, by calling the
 	// following function:
@@ -406,7 +487,12 @@ double *inout;					// Array that will be used to create a
  */
 static inline int mic_prepare()
 {
-	return snd_pcm_prepare(audio_state.record.alsa_handle);
+	return snd_pcm_prepare(audio_state.record.record_handle);
+}
+
+static inline int playback_prepare()
+{
+	return snd_pcm_prepare(audio_state.record.playback_handle);
 }
 
 /**
@@ -417,7 +503,7 @@ static inline int mic_prepare()
  */
 static inline int mic_stop()
 {
-	return snd_pcm_drop(audio_state.record.alsa_handle);
+	return snd_pcm_drop(audio_state.record.record_handle);
 }
 
 /**
@@ -429,7 +515,7 @@ static inline int mic_read(short* buffer, const int nframes)
 {
 int err;
 
-	err = snd_pcm_readi(audio_state.record.alsa_handle,
+	err = snd_pcm_readi(audio_state.record.record_handle,
 						STATIC_CAST(void *, buffer),
 						nframes);
 
@@ -494,7 +580,8 @@ snd_pcm_uframes_t	rframes	= AUDIO_DESIRED_FRAMES;
 								// Period requested to recorder task, expressed
 								// in terms of number of frames
 
-snd_pcm_t *alsa_handle;			// ALSA Hardware Handle used to record audio
+snd_pcm_t *record_handle;		// ALSA Hardware Handle used to record audio
+snd_pcm_t *playback_handle;		// ALSA Hardware Handle used to playback recorded audio
 
 fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
 								// be used to calculate the FFT, optimized for
@@ -505,7 +592,7 @@ fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
 	if (err) return err;
 
 	// Allegro and ALSA initialization
-	err = allegro_alsa_sound_init(&rrate, &rframes, &alsa_handle);
+	err = allegro_alsa_sound_init(&rrate, &rframes, &record_handle, &playback_handle);
 	if (err) return err;
 
 	// FFTW3 initialization
@@ -513,9 +600,10 @@ fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
 	if (err) return err;
 
 	// Copy local vales to global structures
-	audio_state.record.rrate		= rrate;
-	audio_state.record.rframes		= rframes;
-	audio_state.record.alsa_handle	= alsa_handle;
+	audio_state.record.rrate			= rrate;
+	audio_state.record.rframes			= rframes;
+	audio_state.record.record_handle	= record_handle;
+	audio_state.record.playback_handle	= playback_handle;
 
 	audio_state.fft.rrate			= rrate;
 	audio_state.fft.rframes			= rframes;
@@ -999,22 +1087,26 @@ int missing = nframes;	// How many frames are still missing
 				// See after the switch block
 				break;
 			case -EBADFD:
-				fprintf(stderr, "ALSA device was not in correct state.");
+				if (verbose())
+					printf("ALSA device was not in correct state.");
 				return err;
 			case -EPIPE:
 				// NOTICE: Could implement some code to recover from this state
-				fprintf(stderr, "Overrun in ALSA microphone handling.");
+				if (verbose())
+					printf("Overrun in ALSA microphone handling.");
 				return err;
 			case -ESTRPIPE:
 				// NOTICE: Could implement some code to recover from this state
-				fprintf(stderr, "ALSA suspend event occurred.");
+				if (verbose())
+					printf("ALSA suspend event occurred.");
 				return err;
 			default:
-				fprintf(stderr, "ALSA unexpected error in blocking recording!");
+				if (verbose())
+					printf("ALSA unexpected error in blocking recording!");
 				return err;
 			}
 #else
-			// Debug mode, program prints some extra information, but aborts
+			// In debug mode, program prints some extra information, but aborts
 			// if an error occurs
 			switch(err)
 			{
@@ -1023,26 +1115,25 @@ int missing = nframes;	// How many frames are still missing
 				// See after the switch block
 				break;
 			case -EBADFD:
-				fprintf(stderr,
-						"ALSA device was not in correct state: %s.\r\n",
+				printf("ALSA device was not in correct state: %s.\r\n",
 						snd_strerror(err));
 				assert(false);
 
 				break;
 			case -EPIPE:
 				// NOTICE: Could implement some code to recover from this state
-				fprintf(stderr, "ALSA overrun: %s.\r\n", snd_strerror(err));
+				printf("ALSA overrun: %s.\r\n", snd_strerror(err));
 				assert(false);
 
 				break;
 			case -ESTRPIPE:
 				// NOTICE: Could implement some code to recover from this state
-				fprintf(stderr, "WARN: ALSA suspend event: %s.\r\n", snd_strerror(err));
+				printf("WARN: ALSA suspend event: %s.\r\n", snd_strerror(err));
 				assert(false);
 
 				break;
 			default:
-				fprintf(stderr, "ALSA unexpected error: %s.\r\n", snd_strerror(err));
+				printf("ALSA unexpected error: %s.\r\n", snd_strerror(err));
 				assert(false);
 
 				break;
@@ -1069,6 +1160,7 @@ int missing = nframes;	// How many frames are still missing
  * Waits for the given amount of seconds, printing a countdown on the standard
  * output every second, followed by an exclamation mark when the countdown is
  * finished.
+ * TODO: move
  */
 static inline void wait_seconds_print(int nseconds)
 {
@@ -1081,9 +1173,16 @@ static inline void wait_seconds_print(int nseconds)
 	printf("!\r\n");
 }
 
-void record_sample_to_play(int i)
+int record_sample_to_play(int i)
 {
 short *buffer;
+
+	if (!audio_is_file_open(i))
+	{
+		if (verbose())
+			printf("The specified audio file index is invalid!\r\n");
+		return EINVAL;
+	}
 
 	// We record directly in the associated sample, this is just for convenience
 	buffer = audio_state.audio_files[i].recorded_sample;
@@ -1098,25 +1197,83 @@ short *buffer;
 	// Preparing the microphone interface to be used
 	int err = mic_prepare();
 	if (err)
-		abort_on_error("Could not prepare microphone acquisition.");
+	{
+		if (verbose())
+			printf("Could not prepare the microphone for audio acquisition.\r\n");
+		return err;
+	}
 
 	err = mic_read_blocking(buffer, audio_state.record.rframes);
-	// TODO: check return values
 	if (err)
-		// TODO: do not abort
-		abort_on_error("Could not record properly the trigger sample!");
-	else
-		audio_state.audio_files[i].has_rec = true;
+	{
+		if (verbose())
+			printf("Could not record properly the trigger sample!\r\n");
+		return err;
+	}
+
+	audio_state.audio_files[i].has_rec = true;
 
 	// Stop recording
 	err = mic_stop();
 	if (err)
-		abort_on_error("Could not stop properly the microphone acquisition.");
+	{
+		if (verbose())
+			printf("Could not properly stop the microphone acquisition!\r\n");
+		return err;
+	}
+
+	return 0;
+}
+
+static inline int playback_buffer_blocking(short* buffer)
+{
+int remaining = audio_state.record.rframes;
+int err;
+
+	while (remaining > 0)
+	{
+		err = snd_pcm_writei(audio_state.record.playback_handle,
+			buffer,
+			remaining);
+
+		if (err < 0)
+			abort_on_error("Could not play the recorded sample!");
+
+		remaining -= err;
+	}
+
+	return 0;
+}
+
+/**
+ * Mark that no more data will be streamed and close the hardware handle
+ */
+static inline int playback_stop()
+{
+	return snd_pcm_drain(audio_state.record.playback_handle);
 }
 
 void play_recorded_sample(int i)
 {
-	// TODO: this function
+int err;
+
+	if (!audio_is_file_open(i) || !audio_state.audio_files[i].has_rec)
+	{
+		printf("The specified file does not exist or has no associated recording!\r\n");
+		return;
+	}
+
+	err = playback_prepare();
+	if (err)
+		abort_on_error("ALSA PLAYBACK FAILURE!");
+
+	err = playback_buffer_blocking(audio_state.audio_files[i].recorded_sample);
+	if (err)
+		abort_on_error("ALSA PLAYBACK FAILURE!");
+
+	err = playback_stop();
+	if (err)
+		abort_on_error("ALSA PLAYBACK FAILURE!");
 }
 
 void discard_recorded_sample(int i)
@@ -1270,9 +1427,10 @@ unsigned int i;			// Index used to copy data
 				out_buffer[i] = (double)in_buffer[i];
 			}
 
-			// NOTE: To be quickier I should release the in_buffer as soon as
+			// NOTICE: To be quickier I should release the in_buffer as soon as
 			// I get here, but this could lead to some confusion because there
-			// would be two releases and I should skip one depending on the condition
+			// would be two lines that may release the buffer, depending on a
+			// condition, I prefer releasing it after the analysis
 
 			// Calculate in-place FFT using the plan computed above on
 			// current buffer
@@ -1287,7 +1445,7 @@ unsigned int i;			// Index used to copy data
 		}
 		// Otherwise, do nothing
 
-		// Realease acquired buffer if acquired
+		// Realease acquired buffer (if acquired)
 		if (err == 0)
 			ptask_cab_unget(&audio_state.record.cab, in_buffer_index);
 

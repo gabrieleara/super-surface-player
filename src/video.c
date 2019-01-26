@@ -10,8 +10,6 @@
  *
  */
 
-// IDEA: add an antialiasing filter to plots to smooth them
-
 // Standard libraries
 #include <stdbool.h>
 #include <stdio.h>
@@ -876,7 +874,7 @@ static struct timespec current_time;// The current time at this iteration
 													// or mouse is not on screen
 
 	// Position is first copied to a local variable to prevent concurrency errors
-	// NOTE: actually this is not necessary since we told Allegro to work with
+	// NOTICE: actually this is not necessary since we told Allegro to work with
 	// the mouse in polling mode! However, the Allegro documentation states that
 	// this is the preferred way for polling, so we'll stick with that.
 	pos		= mouse_pos;

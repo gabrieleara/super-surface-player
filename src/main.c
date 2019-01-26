@@ -51,18 +51,19 @@ typedef struct __MAIN_STRUCT
 	// NOTE: When modifying the main_state_t data structure, consider
 	// which state should be adopted as default state.
 
-	bool			tasks_terminate;///< tells if concurrent tasks should stop
+	bool			tasks_terminate;///< Tells if concurrent tasks should stop
 									///< their execution
-	bool			quit;			///< tells if the program is shutting down
-	bool			verbose;		///< tells if the verbose flag has been set
+	bool			quit;			///< Tells if the program is shutting down
+	bool			verbose;		///< Tells if the verbose flag has been set
+	bool			wcet_analysis;	///< Tells if the wcet analysis flag as been set
 	char			directory[MAX_DIRECTORY_LENGTH];
-									///< the specified directory where to search
+									///< The specified directory where to search
 									///< for audio files (also referred as the
 									///< current working directory)
 
-	ptask_t			tasks[TASK_NUM];///< all the tasks data
+	ptask_t			tasks[TASK_NUM];///< All the tasks data
 
-	ptask_mutex_t	mutex;			///< protects access to this data structure
+	ptask_mutex_t	mutex;			///< Protects access to this data structure
 	ptask_cond_t	cond;			///< used to wake up the main thread when in
 									///< graphical mode
 } main_state_t;
@@ -74,16 +75,37 @@ typedef struct __MAIN_STRUCT
 /// The state of the program
 static main_state_t main_state =
 {
-	.tasks_terminate = false,
-	.quit = false,
-	.verbose = false,
-	.directory = "",
+	.tasks_terminate	= false,
+	.quit				= false,
+#ifdef NDEBUG
+	.verbose			= false,
+#else
+	// In debug it is automatically verbose
+	.verbose			= true,
+#endif
+	.wcet_analysis		= false,
+	.directory			= "",
 };
 
 
 // -----------------------------------------------------------------------------
 //                           PUBLIC FUNCTIONS
 // -----------------------------------------------------------------------------
+
+bool verbose()
+{
+	return main_state.verbose;
+}
+
+bool wcet_analysis()
+{
+	return main_state.wcet_analysis;
+}
+
+char* working_directory()
+{
+	return main_state.directory;
+}
 
 void abort_on_error(char* message)
 {
@@ -147,14 +169,26 @@ int err = 0;
 	{
 	// NOTE: Even if it is implemented, the verbose command does actually nothing
 	case 'v':
+#ifdef NDEBUG
 		if(main_state.verbose)
 			err = EINVAL;
 		else
+#endif
+			// In debug mode it is automatically verbose, and errors due to
+			// repeated flags are not checked
 			main_state.verbose = true;
 		break;
 
+	case 'w':
+		if (main_state.wcet_analysis)
+			err = EINVAL;
+		else
+			main_state.wcet_analysis = true;
+		break;
+
 	// NOTE: More command line arguments may be placed.
-	// IDEA: Implement a command line that automatically updates WCET for each
+
+	// TODO: Implement a command line that automatically updates WCET for each
 	// task during program execution and prints at the end of each concurrent
 	// execution the calculated values for each task.
 
@@ -441,6 +475,7 @@ static inline void cmd_record(int fnum)
 bool yes		= false;
 bool accepted	= false;
 bool again		= true;
+int err;
 
 	if (!audio_is_file_open(fnum-1))
 	{
@@ -466,13 +501,26 @@ bool again		= true;
 		wait_enter();
 		printf("\r\n");
 
-		record_sample_to_play(fnum-1);
+		err = record_sample_to_play(fnum-1);
+
+		if (err)
+		{
+			printf("Error occurred while recording!\r\n");
+			return;
+		}
 
 		printf("Recorded!\r\nThe recorded sample will now be played.\r\n");
 
 		wait_enter();
 		printf("\r\n");
-		play_recorded_sample(fnum-1);
+
+		again = true;
+
+		while (again)
+		{
+			play_recorded_sample(fnum-1);
+			again = ask_yes_no("Do you want to listen it again?");
+		}
 
 		accepted = ask_yes_no("Are you satisfied with this sample?");
 
