@@ -29,11 +29,19 @@
 
 #define AUDIO_DESIRED_RATE		(44100)	///< Desired acquisition rate (Hz)
 
-// TODO: explain magic numbers
-#define AUDIO_DESIRED_FRAMES	(13*1024) // FIXME: (around 0.3 seconds)
+#define AUDIO_ZERO_PADDING		(1)
+										///< 0 means no zero-padding, 1 means
+										///< padding will be used and it will
+										///< be a dimension equal to the number
+										///< of frames.
+
+// TODO: explain magic numbers - powers of two are extremely fast
+#define AUDIO_DESIRED_FRAMES	(16*1024) // FIXME: (around 0.37 seconds)
 										///< Desired acquisition buffer dimension.
 										///< NOTICE: that the bigger this is,
 										///< the bigger the latency of the system
+
+#define AUDIO_ADD_PADDING(n)	(n * ((AUDIO_ZERO_PADDING) ? 2 : 1))
 
 #define AUDIO_FRAMES_TO_HALFCOMPLEX(frames) ((frames + 1) / 2 - 1)
 										///< Converts the number of acquired
@@ -43,10 +51,17 @@
 										///< See FFTW documentation for further
 										///< details.
 
-#define AUDIO_DESIRED_HALFCOMPLEX	AUDIO_FRAMES_TO_HALFCOMPLEX(AUDIO_DESIRED_FRAMES)
+#define AUDIO_DESIRED_PADFRAMES	(AUDIO_ADD_PADDING(AUDIO_DESIRED_FRAMES))
+
+#define AUDIO_DESIRED_HALFCOMPLEX	AUDIO_FRAMES_TO_HALFCOMPLEX(AUDIO_DESIRED_PADFRAMES)
 										///< Desired dimension of the
 										///< magnitude-only half-complex FFT
 										///< buffer.
+
+// FIXME: documentation
+#define AUDIO_DESIRED_BUFFER_SIZE		(AUDIO_DESIRED_FRAMES)
+#define AUDIO_DESIRED_PADBUFFER_SIZE	(AUDIO_DESIRED_PADFRAMES)
+#define AUDIO_DESIRED_HALFBUFFER_SIZE	(AUDIO_DESIRED_HALFCOMPLEX)
 
 // TODO: actually this should be NTasks that use them + 1
 #define AUDIO_NUM_BUFFERS		(10)

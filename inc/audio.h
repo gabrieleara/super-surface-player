@@ -197,12 +197,17 @@ extern void audio_free_last_fft(int buffer_index);
 /**
  * Returns the real acquisition rate of the recorder.
  */
-extern int audio_get_rrate();
+extern int audio_get_record_rrate();
 
 /**
  * Returns the number of frames captured by the recorder for each sample.
  */
-extern int audio_get_rframes();
+extern int audio_get_record_rframes();
+
+// TODO: documentation
+extern int audio_get_fft_rrate();
+extern int audio_get_fft_rframes();
+
 
 /**
  * Displays a countdown and then records an audio sample that can be used to

@@ -105,7 +105,7 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 								///< recorded audio that can be recognized to
 								///< start it playing
 
-	short recorded_sample[AUDIO_DESIRED_FRAMES];
+	short recorded_sample[AUDIO_DESIRED_BUFFER_SIZE];
 								///< Contains the recorded sample by the user
 								///< to play the audio file whenever a sample
 								///< similar to the recorded one is detected
@@ -124,7 +124,7 @@ typedef struct __AUDIO_RECORD_STRUCT
 	snd_pcm_t *playback_handle;	///< ALSA Hardware Handle used to playback
 								///< recorded audio
 
-	short buffers[AUDIO_NUM_BUFFERS][AUDIO_DESIRED_FRAMES];
+	short buffers[AUDIO_NUM_BUFFERS][AUDIO_DESIRED_BUFFER_SIZE];
 								///< Buffers used within the cab
 
 	ptask_cab_t cab;			///< CAB used to handle allocated buffers
@@ -141,7 +141,7 @@ typedef struct __AUDIO_FFT_STRUCT
 
 	fftw_plan plan;				///< The plan used to perform the FFT
 
-	double buffers[AUDIO_NUM_BUFFERS][AUDIO_DESIRED_FRAMES];
+	double buffers[AUDIO_NUM_BUFFERS][AUDIO_DESIRED_PADBUFFER_SIZE];
 								///< Buffers used within the cab, their
 								///< structure is the one of an
 								///< Halfcomplex-formatted FFT
@@ -407,7 +407,7 @@ void *cab_pointers[AUDIO_NUM_BUFFERS];
 	// structure
 	err = ptask_cab_init(&audio_state.record.cab,
 		AUDIO_NUM_BUFFERS,
-		AUDIO_DESIRED_FRAMES,
+		AUDIO_DESIRED_BUFFER_SIZE,
 		cab_pointers);
 
 	return err;
@@ -449,10 +449,10 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
 	// The array is allocated dynamically, but it will be deallocated as soon a
 	// the construction of the plan is finished. It's the only thing that is
 	// allocated dynamically.
-	inout = STATIC_CAST(double*, fftw_malloc(sizeof(double) * rframes));
+	inout = STATIC_CAST(double*, fftw_malloc(sizeof(double) * AUDIO_ADD_PADDING(rframes)));
 
 	// The returned plan is guaranteed not to be NULL
-	*fft_plan_ptr = fftw_plan_r2r_1d(rframes,
+	*fft_plan_ptr = fftw_plan_r2r_1d(AUDIO_ADD_PADDING(rframes),
 									 inout,
 									 inout,
 									 FFTW_R2HC,
@@ -478,7 +478,7 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
 	// structure
 	err = ptask_cab_init(&audio_state.fft.cab,
 						 AUDIO_NUM_BUFFERS,
-						 AUDIO_DESIRED_FRAMES,
+						 AUDIO_DESIRED_PADBUFFER_SIZE,
 						 cab_pointers);
 
 	return err;
@@ -610,7 +610,7 @@ fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
 	audio_state.record.playback_handle	= playback_handle;
 
 	audio_state.fft.rrate			= rrate;
-	audio_state.fft.rframes			= rframes;
+	audio_state.fft.rframes			= AUDIO_ADD_PADDING(rframes);
 	audio_state.fft.plan			= fft_plan;
 
 	return 0;
@@ -783,11 +783,19 @@ int i;
 
 // -------------- GETTERS --------------
 
-int audio_get_rrate() {
+int audio_get_time_rrate() {
+	return audio_state.record.rrate;
+}
+
+int audio_get_time_rframes() {
+	return audio_state.record.rframes;
+}
+
+int audio_get_fft_rrate() {
 	return audio_state.fft.rrate;
 }
 
-int audio_get_rframes() {
+int audio_get_fft_rframes() {
 	return audio_state.fft.rframes;
 }
 
@@ -1231,9 +1239,9 @@ short *buffer;
  * The handle needs to be prepared first.
  * Returns zero on success, a non-zero value otherwise.
  */
-static inline int playback_buffer_blocking(short* buffer)
+static inline int playback_buffer_blocking(short* buffer, int size)
 {
-int remaining = audio_state.record.rframes;
+int remaining = size;
 int err;
 
 	while (remaining > 0)
@@ -1273,7 +1281,8 @@ int err;
 	if (err)
 		abort_on_error("ALSA PLAYBACK FAILURE!");
 
-	err = playback_buffer_blocking(audio_state.audio_files[i].recorded_sample);
+	err = playback_buffer_blocking(
+		audio_state.audio_files[i].recorded_sample, audio_state.record.rframes);
 	if (err)
 		abort_on_error("ALSA PLAYBACK FAILURE!");
 
@@ -1428,7 +1437,13 @@ unsigned int i;			// Index used to copy data
 				&out_buffer_index);
 
 			// Copy data onto new buffer
-			for (i = 0; i < audio_state.fft.rframes; ++i)
+			// NOTICE: the zero-padding is automatic since the buffers in the CAB
+			// are created as global variables. Values with index greater than
+			// rframes will be automatically zero.
+			// NOTICE: it's not a coincidence I'm using record.rframes instead
+			// than fft.rframes, because the two differ in the case zero-padding
+			// is enabled!
+			for (i = 0; i < audio_state.record.rframes; ++i)
 			{
 				out_buffer[i] = (double)in_buffer[i];
 			}
@@ -1438,8 +1453,15 @@ unsigned int i;			// Index used to copy data
 			// would be two lines that may release the buffer, depending on a
 			// condition, I prefer releasing it after the analysis
 
+			// Reset zero padding if needed, hence if record.rframes < fft.rframes;
+			// This loop starts with i equal to audio_state.record.rframes
+			for (; i < audio_state.fft.rframes; ++i)
+			{
+				out_buffer[i] = 0.;
+			}
+
 			// Calculate in-place FFT using the plan computed above on
-			// current buffer
+			// current buffer (potentially zero-padded)
 			fftw_execute_r2r(audio_state.fft.plan, out_buffer, out_buffer);
 
 			// NOTICE: Output of previous FFT is an halfcomplex notation of the

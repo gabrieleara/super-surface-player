@@ -466,7 +466,7 @@ int rrate;				// Actual acquisition rate
 int rframes;			// Number of frames per audio sample, which is also the
 						// number of values within the fft buffer
 
-	rrate	= audio_get_rrate();
+	rrate	= audio_get_fft_rrate();
 	rframes = audio_get_last_fft(&buffer, &buffer_index);
 
 	if (rframes < 1)
