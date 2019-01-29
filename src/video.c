@@ -255,14 +255,14 @@ char	buffer[4];	// Buffer string used to print on the screen
 int		value;		// Value where to store
 
 	posx = SIDE_X;
-	posy = SIDE_Y + index * SIDE_ELEM_MY;
+	posy = SIDE_Y + index * SIDE_ELEM_HEIGHT;
 
 	blit(
 		gui_state.static_screen.element_sample,
 		gui_state.virtual_screen,
 		0, 0,
 		posx, posy,
-		SIDE_ELEM_MX, SIDE_ELEM_MY);
+		SIDE_ELEM_WIDTH, SIDE_ELEM_HEIGHT);
 
 	textout_ex(
 		gui_state.virtual_screen,
