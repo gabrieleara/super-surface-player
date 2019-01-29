@@ -336,6 +336,7 @@ static inline void cmd_help()
 	printf(" list\t\tList all the opened audio/midi files.\r\n");
 	printf(" listen\t<fnum>\tListen to the specified audio/midi file.\r\n");
 	printf(" play\t\tTo start playing in windowed mode.\r\n");
+	printf(" playback\t<fnum>\tListen to the recorded sample associated with the specified audio/midi file.\r\n");
 	printf(" pwd\t\tPrint current working directory.\r\n");
 	printf(" open\t<fname>\tTo open a new audio/midi file.\r\n");
 	printf(" quit\t\tTo quit this program.\r\n");
@@ -574,6 +575,11 @@ int index = fnum-1;
 	}
 }
 
+static inline void cmd_playback(int fnum)
+{
+	play_recorded_sample(fnum-1);
+}
+
 /**
  * Implements the main loop that is executed whenever the program is in text
  * mode.
@@ -640,6 +646,16 @@ int err;
 				printf("Invalid command. Missing file number.\r\n");
 			else
 				cmd_listen(fnum);
+		}
+		else if (strcmp(command, "playback") == 0)
+		{
+			// Convert second argument to a number
+			err = sscanf(argument, "%d", &fnum);
+
+			if (err < 1)
+				printf("Invalid command. Missing file number.\r\n");
+			else
+				cmd_playback(fnum);
 		}
 		else if (strcmp(command, "close") == 0)
 		{
@@ -764,24 +780,24 @@ static inline int start_fft_task()
 static inline int start_analyzer_tasks()
 {
 int i;
-int num_recordin_files = 0;
+int num_recording_files = 0;
 
 	for (i = 0; i < audio_get_num_files(); ++i)
 	{
 		if (audio_file_has_rec(i))
 		{
 			ptask_short(
-				&main_state.tasks[TASK_ALS_FIRST + num_recordin_files],
+				&main_state.tasks[TASK_ALS_FIRST + num_recording_files],
 				TASK_ALS_WCET,
-				TASK_FFT_PERIOD,
-				TASK_FFT_DEADLINE,
+				TASK_ALS_PERIOD,
+				TASK_ALS_DEADLINE,
 				GET_PRIO(TASK_ALS_PRIORITY),
 				als_task,
 				STATIC_CAST(void *, &i),
 				sizeof(i)
 			);
 
-			++num_recordin_files;
+			++num_recording_files;
 		}
 	}
 
@@ -856,15 +872,15 @@ static inline void join_tasks()
 	ptask_join(&main_state.tasks[TASK_MIC]);
 	ptask_join(&main_state.tasks[TASK_FFT]);
 
-	int num_recordin_files = 0;
+	int num_recording_files = 0;
 	int i;
 
 	for (i = 0; i < audio_get_num_files(); ++i)
 	{
 		if (audio_file_has_rec(i))
 		{
-			ptask_join(&main_state.tasks[TASK_ALS_FIRST + num_recordin_files]);
-			++num_recordin_files;
+			ptask_join(&main_state.tasks[TASK_ALS_FIRST + num_recording_files]);
+			++num_recording_files;
 		}
 	}
 }
