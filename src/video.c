@@ -748,7 +748,7 @@ static inline bool is_mouse_in_side(int x, int y)
 static inline int get_element_id(int x, int y)
 {
 	if (is_mouse_in_side(x, y))
-		return (y - SIDE_Y) / SIDE_ELEM_MY;
+		return (y - SIDE_Y) / SIDE_ELEM_HEIGHT;
 
 	return -1;
 }
@@ -767,7 +767,7 @@ button_id_t id = BUTTON_INVALID;// The type of the selected button
 	if(!is_mouse_in_side(x, y)) return BUTTON_INVALID;
 
 	relx = x - SIDE_X;
-	rely = (y - SIDE_Y) % SIDE_ELEM_MY;
+	rely = (y - SIDE_Y) % SIDE_ELEM_HEIGHT;
 
 	if (CHECK_BUTTON_POSX(relx, PLAY) && CHECK_BUTTON_POSY(rely, PLAY))
 	{
