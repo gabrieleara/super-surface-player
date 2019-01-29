@@ -661,6 +661,11 @@ bool audio_is_file_open(int i)
 	return i >= 0 && i < audio_state.opened_audio_files;
 }
 
+int audio_file_opened()
+{
+	return audio_state.opened_audio_files;
+}
+
 int audio_close_file(int filenum)
 {
 int err = 0;
@@ -693,27 +698,14 @@ int err = 0;
 	return err;
 }
 
-void audio_list_files()
+bool audio_file_has_rec(int i)
 {
-int i;
+	return audio_state.audio_files[i].has_rec;
+}
 
-	if (!audio_state.opened_audio_files)
-	{
-		printf("No audio files are opened.\r\n");
-	}
-	else
-	{
-		for(i = 0; i < audio_state.opened_audio_files; ++i)
-		{
-			printf("\t%d. %s", i+1, audio_state.audio_files[i].filename);
-
-			if (audio_state.audio_files[i].has_rec)
-				printf(" *");
-
-			printf("\r\n");
-		}
-		printf("\r\nFiles with a * have an associated recorded sample.\r\n\r\n");
-	}
+char* audio_file_name(int i)
+{
+	return audio_state.audio_files[i].filename;
 }
 
 /* ------------- SAFE FUNCTIONS - CAN BE CALLED FROM ANY THREAD ------------- */
@@ -783,11 +775,11 @@ int i;
 
 // -------------- GETTERS --------------
 
-int audio_get_time_rrate() {
+int audio_get_record_rrate() {
 	return audio_state.record.rrate;
 }
 
-int audio_get_time_rframes() {
+int audio_get_record_rframes() {
 	return audio_state.record.rframes;
 }
 

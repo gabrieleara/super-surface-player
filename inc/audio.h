@@ -59,6 +59,23 @@ extern int audio_open_file(const char *filename);
 extern bool audio_is_file_open(int i);
 
 /**
+ * Returns the number of opened audio files.
+ */
+extern int audio_file_opened();
+
+/**
+ * Returns true if the given file has an associated recording.
+ * WARNING: no check whether the given audio file index if performed.
+ */
+extern bool audio_file_has_rec(int i);
+
+/**
+ * Returns a null terminated string containing the file name.
+ * WARNING: no check whether the given audio file index if performed.
+ */
+extern char* audio_file_name(int i);
+
+/**
  * Closes an opened audio file and shifts all the indexes of opened audio files
  * back if needed.
  */
@@ -204,10 +221,17 @@ extern int audio_get_record_rrate();
  */
 extern int audio_get_record_rframes();
 
-// TODO: documentation
+/**
+ * Returns the acquisition rate of the recorder, which is also the frequency
+ * that is considered as a base when calculating the FFT of a signal.
+ */
 extern int audio_get_fft_rrate();
-extern int audio_get_fft_rframes();
 
+/**
+ * Returns the number of frames (complete with padding if needed) that are used
+ * when calculating the FFT, which is also the dimension of the FFT output.
+ */
+extern int audio_get_fft_rframes();
 
 /**
  * Displays a countdown and then records an audio sample that can be used to

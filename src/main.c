@@ -471,6 +471,30 @@ bool yes = false;
 	return yes;
 }
 
+static inline void cmd_list_audio_files()
+{
+int i;
+
+	if (!audio_get_num_files())
+	{
+		printf("No audio files are opened.\r\n");
+	}
+	else
+	{
+		for(i = 0; i < audio_get_num_files(); ++i)
+		{
+			printf("\t%d. %s", i+1, audio_file_name(i));
+
+			if (audio_file_has_rec(i))
+				printf(" *");
+
+			printf("\r\n");
+		}
+		printf("\r\nFiles with a * have an associated recorded sample.\r\n\r\n");
+	}
+}
+
+
 static inline void cmd_record(int fnum)
 {
 bool yes		= false;
@@ -621,7 +645,7 @@ int err;
 		}
 		else if (strcmp(command, "list") == 0)
 		{
-			audio_list_files();
+			cmd_list_audio_files();
 		}
 		else if (strcmp(command, "play") == 0)
 		{

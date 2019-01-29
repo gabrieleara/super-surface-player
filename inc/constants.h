@@ -35,32 +35,34 @@
 										///< be a dimension equal to the number
 										///< of frames.
 
-// TODO: explain magic numbers - powers of two are extremely fast
+/// Desired number of frames contained in an audio sample.
+/// It should be a power of two to make the FFT computation way faster.
+/// NOTICE: the bigger this number, the bigger the latency.
 #define AUDIO_DESIRED_FRAMES	(16*1024) // FIXME: (around 0.37 seconds)
-										///< Desired acquisition buffer dimension.
-										///< NOTICE: that the bigger this is,
-										///< the bigger the latency of the system
 
-#define AUDIO_ADD_PADDING(n)	(n * ((AUDIO_ZERO_PADDING) ? 2 : 1))
+/// Adds padding to the specified number if the zero padding is enabled,
+/// otherwise does nothing.
+#define AUDIO_ADD_PADDING(frames)	(frames * ((AUDIO_ZERO_PADDING) ? 2 : 1))
 
+/// Converts the number of acquired frames to the number of values of
+/// the corresponding magnitude-only half-complex FFT.
+/// See FFTW documentation for further details.
 #define AUDIO_FRAMES_TO_HALFCOMPLEX(frames) ((frames + 1) / 2 - 1)
-										///< Converts the number of acquired
-										///< frames to the number of values of
-										///< the corresponding magnitude-only
-										///< half-complex FFT.
-										///< See FFTW documentation for further
-										///< details.
 
+/// Desired number of frames complete with padding
 #define AUDIO_DESIRED_PADFRAMES	(AUDIO_ADD_PADDING(AUDIO_DESIRED_FRAMES))
 
-#define AUDIO_DESIRED_HALFCOMPLEX	AUDIO_FRAMES_TO_HALFCOMPLEX(AUDIO_DESIRED_PADFRAMES)
-										///< Desired dimension of the
-										///< magnitude-only half-complex FFT
-										///< buffer.
+/// Desired number of frames after being converted from halfcomplex notation to
+/// magnitudes (comprehends padding frames if added)
+#define AUDIO_DESIRED_HALFCOMPLEX	(AUDIO_FRAMES_TO_HALFCOMPLEX(AUDIO_DESIRED_PADFRAMES))
 
-// FIXME: documentation
+/// Desired dimension for the acquisition buffer
 #define AUDIO_DESIRED_BUFFER_SIZE		(AUDIO_DESIRED_FRAMES)
+
+/// Desired dimension for the FFT buffer, complete with padding if needed
 #define AUDIO_DESIRED_PADBUFFER_SIZE	(AUDIO_DESIRED_PADFRAMES)
+
+/// Desired dimension of the buffer that will contain
 #define AUDIO_DESIRED_HALFBUFFER_SIZE	(AUDIO_DESIRED_HALFCOMPLEX)
 
 // TODO: actually this should be NTasks that use them + 1
