@@ -40,7 +40,7 @@
 /// Desired number of frames contained in an audio sample.
 /// It should be a power of two to make the FFT computation way faster.
 /// NOTICE: the bigger this number, the bigger the latency.
-#define AUDIO_DESIRED_FRAMES	(16*1024) // FIXME: (around 0.37 seconds)
+#define AUDIO_DESIRED_FRAMES	(8*1024) // FIXME: (around 0.18 seconds)
 
 /// Adds padding to the specified number if the zero padding is enabled,
 /// otherwise does nothing.

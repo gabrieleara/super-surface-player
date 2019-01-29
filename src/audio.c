@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <math.h>
 #include <libgen.h>			// Used for basename
 #include <complex.h>		// Used for C99 standard complex numbers in fftw3
 
@@ -64,6 +65,9 @@
 								///< The number of seconds to wait before
 								///< recording an audio sample
 
+// HACK: move somewhere else
+#define IS_ODD(n) (n & 0x01)
+#define IS_EVEN(n) (!IS_ODD(n))
 
 // -----------------------------------------------------------------------------
 //                           PRIVATE DATA TYPES
@@ -90,23 +94,37 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 	int				panning;	///< Panning used when playing this file
 	int				frequency;	///< Frequency used when playing this file,
 								///< 1000 is the base frequency
-
 	// I decided to not enable loop execution of audio files.
 	// bool loop;				///< Tells if the audio should be reproduced in a loop
+
+	bool has_rec;				///< Tells if the file has an associated
+								///< recorded audio that can be recognized to
+								///< start it playing
 
 	char filename[MAX_AUDIO_NAME_LENGTH];
 								///< Name of the file displayed on the screen,
 								///< contains only the basename, ellipsed if
 								///< too long
 
-	bool has_rec;				///< Tells if the file has an associated
-								///< recorded audio that can be recognized to
-								///< start it playing
+	double autocorr;			///< The cross correlation of the signal with itself
 
 	short recorded_sample[AUDIO_DESIRED_BUFFER_SIZE];
 								///< Contains the recorded sample by the user
 								///< to play the audio file whenever a sample
 								///< similar to the recorded one is detected
+
+	double recorded_fft[AUDIO_DESIRED_PADBUFFER_SIZE];
+								///< Contains the FFT of the recorded sample,
+								///< precomputed for efficiency reasons
+
+	// HACK: remove this attribute and use something else
+	double cross_corr_buffer[AUDIO_DESIRED_PADBUFFER_SIZE];
+								///< Buffer used to compute the cross
+								///< correlation between the recorded sample and
+								///< the acquired signal fft from the microphone,
+								///< allocated here to avoid too much allocation
+								///< on the stack
+								///< NOTE: this attribute MUST be the last one
 } audio_file_desc_t;
 
 /// Status of the resources used to record audio
@@ -128,6 +146,14 @@ typedef struct __AUDIO_RECORD_STRUCT
 	ptask_cab_t cab;			///< CAB used to handle allocated buffers
 } audio_record_t;
 
+typedef struct __FFT_OUTPUT
+{
+	double autocorr;			///< The autocorrelation of the given sample
+	double fft[AUDIO_DESIRED_PADBUFFER_SIZE];
+								///< The FFT of the given sample, its format is
+								///< Halfcomplex-formatted FFT
+} fft_output_t;
+
 /// Status of the resources used to perform fft
 typedef struct __AUDIO_FFT_STRUCT
 {
@@ -138,11 +164,10 @@ typedef struct __AUDIO_FFT_STRUCT
 								///< expressed in terms of number of frames
 
 	fftw_plan plan;				///< The plan used to perform the FFT
+	fftw_plan plan_inverse;		///< The plan used to perform the inverse FFT
 
-	double buffers[AUDIO_NUM_BUFFERS][AUDIO_DESIRED_PADBUFFER_SIZE];
-								///< Buffers used within the cab, their
-								///< structure is the one of an
-								///< Halfcomplex-formatted FFT
+	fft_output_t buffers[AUDIO_NUM_BUFFERS];
+								///< Buffers used within the cab
 
 	ptask_cab_t cab;			///< CAB used to handle allocated buffers
 
@@ -175,14 +200,37 @@ typedef struct __AUDIO_STRUCT
 /// Base empty audio file descriptor
 const audio_file_desc_t audio_file_new =
 {
+	.datap		= { .gen_p = NULL },
 	.type		= AUDIO_TYPE_SAMPLE,
 	.volume		= MAX_VOL,
 	.panning	= MID_PAN,
 	.frequency	= SAME_FRQ,
-	.filename	= "",
 	.has_rec	= false,
 	// .loop		= false,
+	.filename	= "",
 };
+
+void audio_file_copy(audio_file_desc_t *dest, const audio_file_desc_t*src)
+{
+	if (src->has_rec)
+	{
+		// TODO: change this when that array is removed
+		// I need to copy all the arrays anyway, but I can skip the
+		// cross_corr_buffer, which will be the last element
+		memcpy(dest, src, offsetof(audio_file_desc_t, cross_corr_buffer));
+	}
+	else
+	{
+		// I can skip copying the big arrays
+		dest->datap		= src->datap;
+		dest->type		= src->type;
+		dest->volume	= src->type;
+		dest->panning	= src->type;
+		dest->frequency	= src->type;
+		dest->has_rec	= src->has_rec;
+		strcpy(dest->filename, src->filename);
+	}
+}
 
 // -----------------------------------------------------------------------------
 //                           GLOBAL VARIABLES
@@ -345,6 +393,46 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	return 0;
 }
 
+void copy_audio_with_padding(double *out_buffer, const short *in_buffer)
+{
+size_t i;
+	// NOTICE: it's not a coincidence I'm using record.rframes instead
+	// than fft.rframes, because the two differ in the case zero-padding
+	// is enabled!
+	for (i = 0; i < audio_state.record.rframes; ++i)
+	{
+		out_buffer[i] = (double)in_buffer[i];
+	}
+
+	// Reset zero padding if needed, hence if record.rframes < fft.rframes;
+	// This loop starts with i equal to audio_state.record.rframes
+	for (; i < audio_state.fft.rframes; ++i)
+	{
+		out_buffer[i] = 0.;
+	}
+}
+
+
+// TODO: move somewhere else
+void fft(double* data)
+{
+	fftw_execute_r2r(audio_state.fft.plan, data, data);
+}
+
+void ifft(double* data)
+{
+size_t i;
+
+	fftw_execute_r2r(audio_state.fft.plan_inverse, data, data);
+
+	// Normalization, because FFTW computes unnormalized FFT/IFFT
+	for (i = 0; i < audio_state.fft.rframes; ++i)
+	{
+		data[i] /= audio_state.fft.rframes;
+	}
+}
+
+
 /**
  * Initialize ALSA recorder handle.
  * TODO: document arguments
@@ -414,7 +502,9 @@ void *cab_pointers[AUDIO_NUM_BUFFERS];
 /**
  * Initializes FFTW3 library to perform FFT analysis
  */
-static inline int fft_init(snd_pcm_uframes_t rframes, fftw_plan* fft_plan_ptr)
+static inline int fft_init(snd_pcm_uframes_t rframes,
+	fftw_plan* fft_plan_ptr,
+	fftw_plan* fft_plan_inverse_ptr)
 {
 int err;
 int index;
@@ -444,17 +534,27 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
 			"program initialization will surely take longer...\r\n");
 	}
 
+	// Converting to the number of frames comprensive of padding
+	rframes = AUDIO_ADD_PADDING(rframes);
+
 	// The array is allocated dynamically, but it will be deallocated as soon a
 	// the construction of the plan is finished. It's the only thing that is
 	// allocated dynamically.
-	inout = STATIC_CAST(double*, fftw_malloc(sizeof(double) * AUDIO_ADD_PADDING(rframes)));
+	inout = STATIC_CAST(double*, fftw_malloc(sizeof(double) * rframes));
 
 	// The returned plan is guaranteed not to be NULL
-	*fft_plan_ptr = fftw_plan_r2r_1d(AUDIO_ADD_PADDING(rframes),
+	*fft_plan_ptr = fftw_plan_r2r_1d(rframes,
 									 inout,
 									 inout,
 									 FFTW_R2HC,
 									 FFTW_EXHAUSTIVE); // OR FFTW_PATIENT
+
+	// The returned plan is for the inverse FFT
+	*fft_plan_inverse_ptr = fftw_plan_r2r_1d(rframes,
+											 inout,
+											 inout,
+											 FFTW_HC2R,
+											 FFTW_EXHAUSTIVE); // OR FFTW_PATIENT
 
 	// Saving back updated wisdom to dat file
 	fftw_export_wisdom_to_filename(wisdom_filepath);
@@ -469,7 +569,7 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
 	// Construction of CAB pointers for fft buffers
 	for (index = 0; index < AUDIO_NUM_BUFFERS; ++index)
 	{
-		cab_pointers[index] = STATIC_CAST(void*, audio_state.fft.buffers[index]);
+		cab_pointers[index] = STATIC_CAST(void*, &audio_state.fft.buffers[index]);
 	}
 
 	// Initializing FFT CAB buffers, the pointers are copied to the cab
@@ -589,6 +689,8 @@ fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
 								// be used to calculate the FFT, optimized for
 								// the size of the recording buffer
 
+fftw_plan fft_plan_inverse;		// The FFTW3 plan used to compute the inverse FFT
+
 	// Mutex initialization
 	err = ptask_mutex_init(&audio_state.mutex);
 	if (err) return err;
@@ -598,7 +700,7 @@ fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
 	if (err) return err;
 
 	// FFTW3 initialization
-	err = fft_init(rframes, &fft_plan);
+	err = fft_init(rframes, &fft_plan, &fft_plan_inverse);
 	if (err) return err;
 
 	// Copy local vales to global structures
@@ -610,6 +712,7 @@ fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
 	audio_state.fft.rrate			= rrate;
 	audio_state.fft.rframes			= AUDIO_ADD_PADDING(rframes);
 	audio_state.fft.plan			= fft_plan;
+	audio_state.fft.plan_inverse	= fft_plan_inverse;
 
 	return 0;
 }
@@ -638,13 +741,9 @@ int				index;			// Index of newly used audio file descriptor
 	if (file_pointer.gen_p)
 	{
 		// Valid input file
-
-		audio_state.audio_files[index] = audio_file_new;
-
+		audio_file_copy(&audio_state.audio_files[index], &audio_file_new);
 		audio_state.audio_files[index].type = file_type;
-
 		path_to_basename(audio_state.audio_files[index].filename, filename);
-
 		audio_state.audio_files[index].datap = file_pointer;
 
 		++audio_state.opened_audio_files;
@@ -686,7 +785,12 @@ int err = 0;
 
 		// Shift back array, starting from position of filenum
 		for(; filenum < audio_state.opened_audio_files; ++filenum)
-			audio_state.audio_files[filenum] = audio_state.audio_files[filenum+1];
+		{
+			audio_file_copy(
+				&audio_state.audio_files[filenum],
+				&audio_state.audio_files[filenum+1]
+			);
+		}
 
 		// audio_state.audio_files[audio_state.opened_audio_files] = audio_file_new;
 	}
@@ -1029,15 +1133,19 @@ void audio_free_last_record(int buffer_index)
 
 int audio_get_last_fft(const double *buffer_ptr[], int *buffer_index_ptr)
 {
-	int err;
+int err;
+fft_output_t *fft_pointer;	// Pointer to the fft structure obtained from the cab
 
 	err = ptask_cab_getmes(&audio_state.fft.cab,
-		STATIC_CAST(const void **, buffer_ptr),
+		STATIC_CAST(const void **, &fft_pointer),
 		buffer_index_ptr,
 		NULL);
 
 	if (err)
 		return -EAGAIN;
+
+	// Since the fft is stored with autocorrelation, we extract it
+	*buffer_ptr = fft_pointer->fft;
 
 	return audio_state.fft.rframes;
 }
@@ -1166,28 +1274,104 @@ static inline void wait_seconds_print(int nseconds)
 	printf("!\r\n");
 }
 
-int record_sample_to_play(int i)
+int real_index(int i)
 {
-short *buffer;
+	return i;
+}
 
-	if (!audio_is_file_open(i))
+int imaginary_index(int i)
+{
+	return audio_state.fft.rframes - i;
+}
+
+void cross_correlation(double *output, const double *first_fft, const double *second_fft)
+{
+int i;
+int re_idx;
+int im_idx;
+int last_idx;
+
+	// Number of complex numbers composing the fft
+	int number_complex = AUDIO_FRAMES_TO_HALFCOMPLEX(audio_state.fft.rframes);
+
+	// I need to multiply element-wise complex numbers from the first fft to the
+	// complex conjugate of the second_fft, then calculate the inverse fft of
+	// the output
+
+	// First element is always pure real
+	output[0] = first_fft[0] * second_fft[0];
+
+	// Last element is also always pure real (if present)
+	// NOTICE: this element is computed only if the rframes number is even
+	if (IS_EVEN(audio_state.fft.rframes))
 	{
-		if (verbose())
-			printf("The specified audio file index is invalid!\r\n");
-		return EINVAL;
+		last_idx = audio_state.fft.rframes / 2;
+		output[last_idx] = first_fft[last_idx] * second_fft[last_idx];
 	}
 
-	// We record directly in the associated sample, this is just for convenience
-	buffer = audio_state.audio_files[i].recorded_sample;
+	// Starting from second element, until AUDIO_FRAMES_TO_HALFCOMPLEX(fft.rframes)
+	// multiply together complex numbers:
+	//	out	= a * conj(b)
+	//		= ...
+	//		= re(a)*re(b) + im(a)*im(b) + j*(im(a)*re(b) - re(a)*im(b))
 
-	// Since we overwrite the previous one, we mark temprarily that this file
-	// has no sample associated with it
-	audio_state.audio_files[i].has_rec = false;
+	// Thus we can calculate separately the two values as
+	// re(out) = re(a)*re(b) + im(a)*im(b)
+	// im(out) = im(a)*re(b) - re(a)*im(b)
 
-	wait_seconds_print(COUNTDOWN_SECONDS);
+	for(i = 1; i <= number_complex; ++i)
+	{
+		re_idx = real_index(i);
+		im_idx = imaginary_index(i);
+		output[re_idx] = first_fft[re_idx] * second_fft[re_idx]
+					   + first_fft[im_idx] * second_fft[im_idx];
+		output[im_idx] = first_fft[im_idx] * second_fft[re_idx]
+					   - first_fft[re_idx] * second_fft[im_idx];
+	}
+
+	// Finally, compute the inverse fft
+	ifft(output);
+}
+
+double max(double *v, size_t n)
+{
+size_t i;
+double m = v[0];
+
+	for (i = 1; i < n; ++i)
+	{
+		if (m < v[i])
+			m = v[i];
+	}
+
+	return m;
+}
+
+double unnormalized_cross_correlation(double *buffer,
+	const double *first_fft, const double *second_fft)
+{
+	cross_correlation(buffer, first_fft, second_fft);
+
+	double correlation_value = max(buffer, audio_state.fft.rframes);
+
+	return correlation_value;
+}
+
+double normalized_cross_correlation(double* buffer,
+	const double *first_fft, const double *second_fft,
+	double first_autocorr, double second_autocorr)
+{
+	double unnormalized = unnormalized_cross_correlation(buffer, first_fft, second_fft);
+
+	return (unnormalized * unnormalized) / (first_autocorr * second_autocorr);
+}
+
+int record_sample(short* buffer)
+{
+int err;
 
 	// Preparing the microphone interface to be used
-	int err = mic_prepare();
+	err = mic_prepare();
 	if (err)
 	{
 		if (verbose())
@@ -1203,8 +1387,6 @@ short *buffer;
 		return err;
 	}
 
-	audio_state.audio_files[i].has_rec = true;
-
 	// Stop recording
 	err = mic_stop();
 	if (err)
@@ -1214,6 +1396,60 @@ short *buffer;
 		return err;
 	}
 
+	return 0;
+}
+
+int record_sample_to_play(int i)
+{
+int err;
+
+	if (!audio_is_file_open(i))
+	{
+		if (verbose())
+			printf("The specified audio file index is invalid!\r\n");
+		return EINVAL;
+	}
+
+	// Since we overwrite the previous one, we mark temprarily that this file
+	// has no sample associated with it
+	audio_state.audio_files[i].has_rec = false;
+
+	// Wait a few seconds to let the user get the timing right
+	wait_seconds_print(COUNTDOWN_SECONDS);
+
+	// Record it
+	err = record_sample(audio_state.audio_files[i].recorded_sample);
+	if(err)
+		return err;
+
+	audio_state.audio_files[i].has_rec = true;
+
+	// Calculate the FFT of the signal once for later use
+	copy_audio_with_padding(audio_state.audio_files[i].recorded_fft,
+							audio_state.audio_files[i].recorded_sample);
+
+	fft(audio_state.audio_files[i].recorded_fft);
+
+	// Calculate autocorrelation once for later use, defined as the
+	// cross-correlation with itself
+	audio_state.audio_files[i].autocorr = unnormalized_cross_correlation(
+		audio_state.audio_files[i].cross_corr_buffer,
+		audio_state.audio_files[i].recorded_fft,
+		audio_state.audio_files[i].recorded_fft
+	);
+
+	// TODO: remove this check
+	/*
+	double watch0 = normalized_cross_correlation(
+		audio_state.audio_files[i].cross_corr_buffer,
+		audio_state.audio_files[i].recorded_fft,
+		audio_state.audio_files[i].recorded_fft,
+		audio_state.audio_files[i].autocorr,
+		audio_state.audio_files[i].autocorr
+	);
+
+	printf("The normalized cross-correlation with itself is %f!\r\n", watch0);
+	*/
 	return 0;
 }
 
@@ -1279,7 +1515,6 @@ void discard_recorded_sample(int i)
 {
 	audio_state.audio_files[i].has_rec = false;
 }
-
 
 // -----------------------------------------------------------------------------
 //                                  TASKS
@@ -1375,6 +1610,8 @@ int		missing;		// How many frames are missing
 }
 
 /// The body of the fft task
+/// NOTICE: this task code is not reentrant, you can't have mutiple FFT Tasks
+/// running concurrently at the same moment
 void *fft_task(void *arg)
 {
 ptask_t *tp; // task pointer
@@ -1394,7 +1631,10 @@ const short *in_buffer;	// Pointer to local input buffer
 int out_buffer_index;	// Index of local buffer used to produce fft data
 double *out_buffer;		// Pointer to local output buffer
 
-unsigned int i;			// Index used to copy data
+static double cross_corr_buffer[AUDIO_DESIRED_PADBUFFER_SIZE];
+						// Buffer used to calculate cross-correlation
+
+fft_output_t *out_pointer;
 
 	tp = STATIC_CAST(ptask_t *, arg);
 	// task_id = ptask_get_id(tp);
@@ -1413,40 +1653,40 @@ unsigned int i;			// Index used to copy data
 		// If the acquired buffer has not been analyzed yet
 		if (err != EAGAIN && time_cmp(last_timestamp, new_timestamp) < 0)
 		{
+			/*
+			struct timespec prova;
+			time_diff(&prova, new_timestamp, last_timestamp);
+
+			printf("TASL_FFT since last SAMPLE: %lld.%.9ld seconds.\r\n", (long long)prova.tv_sec, prova.tv_nsec);
+			*/
+
 			last_timestamp = new_timestamp;
 
 			// Get buffer on which operate
 			ptask_cab_reserve(&audio_state.fft.cab,
-				STATIC_CAST(void **, &out_buffer),
+				STATIC_CAST(void **, &out_pointer),
 				&out_buffer_index);
 
-			// Copy data onto new buffer
-			// NOTICE: the zero-padding is automatic since the buffers in the CAB
-			// are created as global variables. Values with index greater than
-			// rframes will be automatically zero.
-			// NOTICE: it's not a coincidence I'm using record.rframes instead
-			// than fft.rframes, because the two differ in the case zero-padding
-			// is enabled!
-			for (i = 0; i < audio_state.record.rframes; ++i)
-			{
-				out_buffer[i] = (double)in_buffer[i];
-			}
+			out_buffer = out_pointer->fft;
+
+			// Copy data into new buffer
+			copy_audio_with_padding(out_buffer, in_buffer);
 
 			// NOTICE: To be quickier I should release the in_buffer as soon as
 			// I get here, but this could lead to some confusion because there
 			// would be two lines that may release the buffer, depending on a
 			// condition, I prefer releasing it after the analysis
 
-			// Reset zero padding if needed, hence if record.rframes < fft.rframes;
-			// This loop starts with i equal to audio_state.record.rframes
-			for (; i < audio_state.fft.rframes; ++i)
-			{
-				out_buffer[i] = 0.;
-			}
-
 			// Calculate in-place FFT using the plan computed above on
 			// current buffer (potentially zero-padded)
-			fftw_execute_r2r(audio_state.fft.plan, out_buffer, out_buffer);
+			fft(out_buffer);
+
+			// TODO: Should calculate its autocorrelation and publish that too somewhere, along with the fft
+			out_pointer->autocorr = unnormalized_cross_correlation(
+				cross_corr_buffer,
+				out_buffer,
+				out_buffer
+			);
 
 			// NOTICE: Output of previous FFT is an halfcomplex notation of the
 			// FFT, it should be changed to a full array of magniutes to be
@@ -1485,9 +1725,9 @@ ptask_t *tp; // task pointer
 // Local variables
 // int err;
 
-// struct timespec last_timestamp = { .tv_sec = 0, .tv_nsec = 0};
+struct timespec last_timestamp = { .tv_sec = 0, .tv_nsec = 0};
 						// Timestamp of last accessed input buffer
-// struct timespec new_timestamp;
+struct timespec new_timestamp;
 						// Timestamp of the new input buffer
 
 // int in_buffer_index;	// Index of local buffer used to get microphone data
@@ -1501,18 +1741,63 @@ int file_index;			// Index of the file that has been associated with this task
 	tp = STATIC_CAST(ptask_t *, arg);
 	// task_id = ptask_get_id(tp);
 
-	// TODO: Check whether this converts arguments to the integer corresponding to the associated file
+	// Get the associated file index as it is the only argument
 	file_index = *STATIC_CAST(int*, &tp->args);
 
-	printf("Started an analyzer task for the file of index %d!\r\n", file_index);
+	// TODO: log function
+	// printf("Started an analyzer task for the file of index %d!\r\n", file_index);
 
 	// Variables initialization and initial computation
 
 	ptask_start_period(tp);
 
+const fft_output_t *fft_ptr;
+ptask_cab_id_t buffer_id;
+int err;
+double correlation;
+
 	while (!main_get_tasks_terminate())
 	{
 		// TODO: DO STUFF
+		// TODO: check timestamp too
+		err = ptask_cab_getmes(&audio_state.fft.cab,
+			STATIC_CAST(const void **, &fft_ptr),
+			&buffer_id,
+			&new_timestamp
+		);
+
+		// If the acquired buffer has not been analyzed yet
+		if (err != EAGAIN && time_cmp(last_timestamp, new_timestamp) < 0)
+		{
+			/*
+			struct timespec prova;
+			time_diff(&prova, new_timestamp, last_timestamp);
+
+			printf("TASL_ALS since last FFT: %lld.%.9ld seconds.\r\n", (long long)prova.tv_sec, prova.tv_nsec);
+			*/
+
+			last_timestamp = new_timestamp;
+
+			correlation = normalized_cross_correlation(
+				audio_state.audio_files[file_index].cross_corr_buffer,
+				audio_state.audio_files[file_index].recorded_fft,
+				fft_ptr->fft,
+				audio_state.audio_files[file_index].autocorr,
+				fft_ptr->autocorr // the autocorrelation of last fft (which should be computed by the fft task)
+			);
+
+			// printf("Correlation with file %d is %f .\r\n", file_index+1, correlation);
+
+			// TODO: magic number
+			if (fabs(correlation) > 0.35) {
+				// TODO: insert time decay
+				audio_play_file(file_index);
+			}
+		}
+
+		// Realease acquired buffer (if acquired)
+		if (err == 0)
+			ptask_cab_unget(&audio_state.fft.cab, buffer_id);
 
 		if (ptask_deadline_miss(tp))
 			printf("TASK_ALS for file %d missed %d deadlines!\r\n",
