@@ -264,12 +264,13 @@ extern void discard_recorded_sample(int i);
 //@{
 
 /// The body of the microphone task
-// extern ptask_body_t microphone_task;
 extern void *microphone_task(void *arg);
 
 /// The body of the fft task
-// extern ptask_body_t fft_task;
 extern void *fft_task(void *arg);
+
+/// The body of the analyzer task
+extern void *als_task(void *arg);
 
 //@}
 

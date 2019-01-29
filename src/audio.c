@@ -56,8 +56,6 @@
 #define MAX_FREQ	9990		///< Maximum frequency adjustment
 #define MIN_FREQ	0			///< Minimum frequency adjustment
 
-#define MAX_AUDIO_FILES 8		///< The maximum number of opened audio files
-
 #define MAX_AUDIO_NAME_LENGTH 32
 								///< The maximum length of the audio file
 								///< base name
@@ -155,7 +153,7 @@ typedef struct __AUDIO_STRUCT
 {
 	// NOTE: When modifying the audio_state_t data structure, consider
 	// which state should be adopted as default state.
-	audio_file_desc_t audio_files[MAX_AUDIO_FILES];
+	audio_file_desc_t audio_files[AUDIO_MAX_FILES];
 								///< Array of opened audio files descriptors for
 								///< reproduction
 
@@ -622,7 +620,7 @@ audio_pointer_t	file_pointer;	// Pointer to the opened file
 audio_type_t	file_type;		// Detected file type
 int				index;			// Index of newly used audio file descriptor
 
-	if (audio_state.opened_audio_files == MAX_AUDIO_FILES)
+	if (audio_state.opened_audio_files >= AUDIO_MAX_FILES)
 		return EAGAIN;
 
 	index = audio_state.opened_audio_files;
@@ -800,18 +798,12 @@ int audio_get_num_files()
 
 const char* audio_get_filename(int i)
 {
-char* ret;
-
-	if (i >= audio_state.opened_audio_files)
+	if (!audio_is_file_open(i))
 		return NULL;
 
-	ptask_mutex_lock(&audio_state.mutex);
-
-	ret = audio_state.audio_files[i].filename;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-
-	return ret;
+	// Safe since the files cannot be opened/closed in multithreaded
+	// environment
+	return audio_state.audio_files[i].filename;
 }
 
 int audio_get_volume(int i)
@@ -1480,6 +1472,56 @@ unsigned int i;			// Index used to copy data
 	// The reset can be done here because the only task that reserves buffers
 	// for writing purposes is this one
 	ptask_cab_reset(&audio_state.fft.cab);
+
+	return NULL;
+}
+
+/// The body of the analyzer task
+void *als_task(void *arg)
+{
+ptask_t *tp; // task pointer
+// int task_id; // task identifier
+
+// Local variables
+// int err;
+
+// struct timespec last_timestamp = { .tv_sec = 0, .tv_nsec = 0};
+						// Timestamp of last accessed input buffer
+// struct timespec new_timestamp;
+						// Timestamp of the new input buffer
+
+// int in_buffer_index;	// Index of local buffer used to get microphone data
+// const double *in_buffer;	// Pointer to local input buffer
+
+// TODO: there is no out buffer, but there may be a local copy
+
+// unsigned int i;			// Index used to copy data
+int file_index;			// Index of the file that has been associated with this task
+
+	tp = STATIC_CAST(ptask_t *, arg);
+	// task_id = ptask_get_id(tp);
+
+	// TODO: Check whether this converts arguments to the integer corresponding to the associated file
+	file_index = *STATIC_CAST(int*, &tp->args);
+
+	printf("Started an analyzer task for the file of index %d!\r\n", file_index);
+
+	// Variables initialization and initial computation
+
+	ptask_start_period(tp);
+
+	while (!main_get_tasks_terminate())
+	{
+		// TODO: DO STUFF
+
+		if (ptask_deadline_miss(tp))
+			printf("TASK_ALS for file %d missed %d deadlines!\r\n",
+				file_index+1, ptask_get_dmiss(tp));
+
+		ptask_wait_for_period(tp);
+	}
+
+	// Cleanup
 
 	return NULL;
 }

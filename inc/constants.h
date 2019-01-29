@@ -27,6 +27,8 @@
  */
 //@{
 
+#define AUDIO_MAX_FILES			(8)		///< The maximum number of opened audio files
+
 #define AUDIO_DESIRED_RATE		(44100)	///< Desired acquisition rate (Hz)
 
 #define AUDIO_ZERO_PADDING		(1)
@@ -386,13 +388,13 @@
 //@{
 
 // The tasks are: gui, user interaction, microphone, fft and analysis.
-#define TASK_GUI	(0)
-#define TASK_UI		(1)
-#define TASK_MIC	(2)
-#define TASK_FFT	(3)
-#define TASK_ALS	(4)
+#define TASK_GUI		(0)
+#define TASK_UI			(1)
+#define TASK_MIC		(2)
+#define TASK_FFT		(3)
+#define TASK_ALS_FIRST	(4)
 
-#define	TASK_NUM	(5)
+#define	TASK_NUM		(TASK_ALS_FIRST + AUDIO_MAX_FILES)
 
 #define WCET_UNKNOWN (0)
 
@@ -424,7 +426,7 @@
 // MICROPHONE TASK
 
 #define TASK_MIC_WCET		(WCET_UNKNOWN)
-#define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD/10)
+#define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD / 10)
 #define TASK_MIC_DEADLINE 	(TASK_MIC_PERIOD)
 #define TASK_MIC_PRIORITY	(4)
 
@@ -434,6 +436,12 @@
 #define TASK_FFT_PERIOD		(AUDIO_DESIRED_PERIOD / 10)
 #define TASK_FFT_DEADLINE	(TASK_FFT_PERIOD)
 #define TASK_FFT_PRIORITY	(3)
+
+#define TASK_ALS_WCET		(WCET_UNKNOWN)
+#define TASK_ALS_PERIOD		(AUDIO_DESIRED_PERIOD / 10)
+#define TASK_ALS_DEADLINE	(TASK_ALS_PERIOD)
+#define TASK_ALS_PRIORITY	(5)
+
 
 // TODO: Define characteristics of each ANALYSIS TASK
 

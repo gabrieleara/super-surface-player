@@ -85,7 +85,7 @@ ptask_set_scheduler(SCHED_RR);
 // longer than the lifetime of the relative task
 ptask_t task0;
 
-if(ptask_short(&task0, 10000l, 20, 20, 1, task_body))
+if(ptask_short(&task0, 10000l, 20, 20, 1, task_body, NULL, 0))
 {
 	printf("Something wrong happened!");
 	return -1;
@@ -154,24 +154,31 @@ typedef enum __PTASK_ENUM {
 	PS_JOINABLE
 } ptask_state_t;
 
+/// The maximum number of bytes that can be given as argument to a ptask
+#define PTASK_ARGS_SIZE	(32)
+
 /**
  * The structure representing a task
  */
 typedef struct __PTASK_STRUCT
 {
-	int id;				///< identificator of a ptask
-	long wcet;			///< worst case execution time (in us): 0 means unknown
+	int id;				///< Identificator of a ptask
+	long wcet;			///< Worst case execution time (in us): 0 means unknown
 	int period;			///< in milliseconds
-	int deadline;		///< relative to activation time (in ms)
-	int priority;		///< value between [0,99], standard should be in [0,32]
-	int dmiss;			///< no. of occurred deadline misses
-	struct timespec at;	///< next activ. time
-	struct timespec dl;	///< next abs. deadline
+	int deadline;		///< Relative to activation time (in ms)
+	int priority;		///< Value between [0,99], standard should be in [0,32]
+	int dmiss;			///< Number of occurred deadline misses
+	struct timespec at;	///< Next activation time
+	struct timespec dl;	///< Next absolute deadline
 
-	ptask_state_t _state;///< state of the ptask, see ptask_state_t
+	ptask_state_t _state;///< State of the ptask, see ptask_state_t
 
-	pthread_t _tid;		///< pthread id of the task
-	pthread_attr_t _attr;///< pthread params of the task
+	pthread_t _tid;		///< Pthread id of the task
+	pthread_attr_t _attr;///< Pthread params of the task
+
+	char args[PTASK_ARGS_SIZE];
+						///< Extra arguments that may be given to the task,
+						///< up to PTASK_ARGS_SIZE bytes
 } ptask_t;
 
 /// Alias of phtread_mutex_t
@@ -262,6 +269,17 @@ extern int ptask_set_params(ptask_t *ptask, long wcet, int period, int deadline,
 	int priority);
 
 /**
+ * Copies the given arguments into the ptask_t structure, so that the task can
+ * later retrieve them.
+ * The parameter args must be a pointer to a contiguous memory area of at
+ * least args_size bytes.
+ * Returns 0 on success, a non zero value otherwise.
+ *
+ * NOTICE: this function can be called only before starting the ptask.
+ */
+extern int ptask_set_args(ptask_t *ptask, void *args, size_t args_size);
+
+/**
  * Creates a new (previously initialized) ptask and starts its execution with
  * the given body function.
  * Returns 0 on success, a non zero value otherwise.
@@ -280,7 +298,8 @@ extern int ptask_destroy(ptask_t *ptask);
  * Returns 0 on success, a non zero value otherwise.
  */
 extern int ptask_short(ptask_t *ptask,
-	long wcet, int period, int deadline, int priority, ptask_body_t *body);
+	long wcet, int period, int deadline, int priority, ptask_body_t *body,
+	void *args, size_t args_size);
 
 /**
  * Cancels a previously started ptask, if it is still running.

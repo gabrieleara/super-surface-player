@@ -171,7 +171,7 @@ int err = 0;
 	// NOTE: Even if it is implemented, the wcet_analysis command does actually nothing
 	case 'v':
 #ifdef NDEBUG
-		if(main_state.verbose)
+		if (main_state.verbose)
 			err = EINVAL;
 		else
 #endif
@@ -250,7 +250,8 @@ int			begin = 0;					// The index from which we will copy the
 	// always impossible for the sake of simplicity.
 
 	// Last character must be a slash
-	if (cwd[cwdlen-1] != '/') {
+	if (cwd[cwdlen-1] != '/')
+	{
 		cwd[cwdlen] = '/';
 		cwd[cwdlen+1] = '\0';
 		++cwdlen;
@@ -270,10 +271,10 @@ int			begin = 0;					// The index from which we will copy the
 		// Get current argument
 		str = argv[i];
 
-		if(str[0] == '-')
+		if (str[0] == '-')
 		{
 			// It shall be a command line code specifier (minus sign + a character)
-			if(strlen(str) != 2)
+			if (strlen(str) != 2)
 				err = EINVAL;
 			else
 				err = check_argument_code(str[1]);
@@ -292,7 +293,8 @@ int			begin = 0;					// The index from which we will copy the
 			}
 			else
 			{
-				if (str[0] == '/') {
+				if (str[0] == '/')
+				{
 					begin = 0;
 				}
 
@@ -300,7 +302,7 @@ int			begin = 0;					// The index from which we will copy the
 				len += begin;
 
 				// Last character must be a slash
-				if(main_state.directory[len-1] != '/')
+				if (main_state.directory[len-1] != '/')
 				{
 					main_state.directory[len] = '/';
 					main_state.directory[len+1] = '\0';
@@ -367,7 +369,7 @@ static inline void cmd_open(char* filename)
 char	buffer[MAX_CHAR_BUFFER_SIZE];
 int		err = 0;
 
-	if(filename[0] != '/')
+	if (filename[0] != '/')
 	{
 		strcpy(buffer, main_state.directory);
 		strncat(buffer, filename, sizeof(buffer));
@@ -448,7 +450,8 @@ char *token;
 bool answer = false;
 bool yes = false;
 
-	while(!answer) {
+	while (!answer)
+	{
 		printf("%s [y/n] ", query);
 
 		fgets(buffer, sizeof(buffer), stdin);
@@ -457,10 +460,12 @@ bool yes = false;
 		if (token == NULL)
 		{
 			// Do nothing, reask
-		} else if (strcmp(token, "y") == 0 || strcmp(token, "yes") == 0) {
+		} else if (strcmp(token, "y") == 0 || strcmp(token, "yes") == 0)
+		{
 			answer = true;
 			yes = true;
-		} else if (strcmp(token, "n") == 0 || strcmp(token, "no") == 0) {
+		} else if (strcmp(token, "n") == 0 || strcmp(token, "no") == 0)
+		{
 			answer = true;
 			yes = false;
 		} else {
@@ -481,7 +486,7 @@ int i;
 	}
 	else
 	{
-		for(i = 0; i < audio_get_num_files(); ++i)
+		for (i = 0; i < audio_get_num_files(); ++i)
 		{
 			printf("\t%d. %s", i+1, audio_file_name(i));
 
@@ -501,8 +506,9 @@ bool yes		= false;
 bool accepted	= false;
 bool again		= true;
 int err;
+int index = fnum-1;
 
-	if (!audio_is_file_open(fnum-1))
+	if (!audio_is_file_open(index))
 	{
 		printf("A wrong file number has been specified. Aborted.\r\n");
 		return;
@@ -520,13 +526,14 @@ int err;
 		return;
 	}
 
-	while(!accepted && again) {
+	while (!accepted && again)
+	{
 		printf("You choose to record a new entry, the program will start recording after exactly 5 seconds after your next input.\r\n");
 
 		wait_enter();
 		printf("\r\n");
 
-		err = record_sample_to_play(fnum-1);
+		err = record_sample_to_play(index);
 
 		if (err)
 		{
@@ -543,19 +550,20 @@ int err;
 
 		while (again)
 		{
-			play_recorded_sample(fnum-1);
+			play_recorded_sample(index);
 			again = ask_yes_no("Do you want to listen it again?");
 		}
 
 		accepted = ask_yes_no("Are you satisfied with this sample?");
 
-		if (!accepted) {
+		if (!accepted)
+		{
 			again = ask_yes_no("Do you wish to record another sample? "
 				"If you answer no the recorded sample will be discarded.");
 
 			if (!again)
 			{
-				discard_recorded_sample(fnum-1);
+				discard_recorded_sample(index);
 				printf("Discarded!\r\n");
 			}
 		}
@@ -589,7 +597,7 @@ int err;
 		"Type help for a list of the available commands...\r\n");
 
 	// While the program should keep running in terminal mode
-	while(!main_state.quit && !start_graphic_mode)
+	while (!main_state.quit && !start_graphic_mode)
 	{
 		// Print prompt
 		printf("\r\n:");
@@ -691,7 +699,9 @@ static inline int start_gui_task()
 			TASK_GUI_PERIOD,
 			TASK_GUI_DEADLINE,
 			GET_PRIO(TASK_GUI_PRIORITY),
-			gui_task);
+			gui_task,
+			NULL,
+			0);
 }
 
 /**
@@ -706,7 +716,9 @@ static inline int start_ui_task()
 			TASK_UI_PERIOD,
 			TASK_UI_DEADLINE,
 			GET_PRIO(TASK_UI_PRIORITY),
-			user_interaction_task);
+			user_interaction_task,
+			NULL,
+			0);
 }
 
 /**
@@ -721,7 +733,9 @@ static inline int start_microphone_task()
 			TASK_MIC_PERIOD,
 			TASK_MIC_DEADLINE,
 			GET_PRIO(TASK_MIC_PRIORITY),
-			microphone_task);
+			microphone_task,
+			NULL,
+			0);
 	//return 0;
 }
 
@@ -737,7 +751,9 @@ static inline int start_fft_task()
 			TASK_FFT_PERIOD,
 			TASK_FFT_DEADLINE,
 			GET_PRIO(TASK_FFT_PRIORITY),
-			fft_task);
+			fft_task,
+			NULL,
+			0);
 }
 
 
@@ -745,8 +761,30 @@ static inline int start_fft_task()
  * Initializes and starts the analyzer task, returning zero on success.
  * TODO: it may be necessary to start many of these
  */
-static inline int start_analyzer_task()
+static inline int start_analyzer_tasks()
 {
+int i;
+int num_recordin_files = 0;
+
+	for (i = 0; i < audio_get_num_files(); ++i)
+	{
+		if (audio_file_has_rec(i))
+		{
+			ptask_short(
+				&main_state.tasks[TASK_ALS_FIRST + num_recordin_files],
+				TASK_ALS_WCET,
+				TASK_FFT_PERIOD,
+				TASK_FFT_DEADLINE,
+				GET_PRIO(TASK_ALS_PRIORITY),
+				als_task,
+				STATIC_CAST(void *, &i),
+				sizeof(i)
+			);
+
+			++num_recordin_files;
+		}
+	}
+
 	// TODO: This task should be divided between multiple tasks, one for each
 	// opened file with an associated record trigger.
 
@@ -798,7 +836,7 @@ int err;
 	err = start_fft_task();
 	if (err) return err;
 
-	err = start_analyzer_task();
+	err = start_analyzer_tasks();
 	return err;
 }
 
@@ -816,6 +854,19 @@ static inline void join_tasks()
 	ptask_join(&main_state.tasks[TASK_UI]);
 	ptask_join(&main_state.tasks[TASK_GUI]);
 	ptask_join(&main_state.tasks[TASK_MIC]);
+	ptask_join(&main_state.tasks[TASK_FFT]);
+
+	int num_recordin_files = 0;
+	int i;
+
+	for (i = 0; i < audio_get_num_files(); ++i)
+	{
+		if (audio_file_has_rec(i))
+		{
+			ptask_join(&main_state.tasks[TASK_ALS_FIRST + num_recordin_files]);
+			++num_recordin_files;
+		}
+	}
 }
 
 //@}
@@ -835,7 +886,7 @@ static inline void main_wait()
 {
 	ptask_mutex_lock(&main_state.mutex);
 
-	while(!main_state.tasks_terminate)
+	while (!main_state.tasks_terminate)
 		ptask_cond_wait(&main_state.cond, &main_state.mutex);
 
 	ptask_mutex_unlock(&main_state.mutex);
@@ -856,11 +907,11 @@ int err;
 #ifdef NDEBUG
 	// Program has not been compiled for debug, so I can use real-time
 	// scheduling
-	err = ptask_set_scheduler(SCHED_FIFO); if(err) return err;
+	err = ptask_set_scheduler(SCHED_FIFO); if (err) return err;
 #else
 	// Cannot debug using sudo privileges, so for debugging purposes I'll use
 	// another scheduler
-	err = ptask_set_scheduler(SCHED_OTHER); if(err) return err;
+	err = ptask_set_scheduler(SCHED_OTHER); if (err) return err;
 #endif
 
 	// Allegro initialization
@@ -911,11 +962,11 @@ int err;
 	if (err)
 		abort_on_error("Could not properly initialize the program.");
 
-	while(!main_state.quit)
+	while (!main_state.quit)
 	{
 		terminal_mode();
 
-		if(!main_state.quit)
+		if (!main_state.quit)
 		{
 			printf("Entering graphic mode...\r\n");
 

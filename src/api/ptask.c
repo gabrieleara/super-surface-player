@@ -15,6 +15,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "api/time_utils.h"
 #include "api/ptask.h"
@@ -248,8 +249,25 @@ int ptask_destroy(ptask_t *ptask)
 
 }
 
+int ptask_set_args(ptask_t *ptask, void* args, size_t args_size)
+{
+	if (!_ptask_isnew(ptask))
+		return EINVAL;
+
+	if (args_size > PTASK_ARGS_SIZE)
+		return EINVAL;
+
+	if (args == NULL || args_size < 1)
+		return 0;
+
+	memcpy(ptask->args, args, args_size);
+
+	return 0;
+}
+
 int ptask_short(ptask_t *ptask,
-	long wcet, int period, int deadline, int priority, ptask_body_t *body)
+	long wcet, int period, int deadline, int priority, ptask_body_t *body,
+	void* args, size_t args_size)
 {
 int err;
 
@@ -259,6 +277,15 @@ int err;
 	// I'm not checking the returned value because the following function cannot
 	// fail in this point
 	ptask_set_params(ptask, wcet, period, deadline, priority);
+
+	err = ptask_set_args(ptask, args, args_size);
+
+	if (err)
+	{
+		ptask->_state = PS_ERROR;
+		ptask_destroy(ptask);
+		return err;
+	}
 
 	err = ptask_create(ptask, body);
 
