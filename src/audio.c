@@ -116,15 +116,6 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 	double recorded_fft[AUDIO_DESIRED_PADBUFFER_SIZE];
 								///< Contains the FFT of the recorded sample,
 								///< precomputed for efficiency reasons
-
-	// HACK: remove this attribute and use something else
-	double cross_corr_buffer[AUDIO_DESIRED_PADBUFFER_SIZE];
-								///< Buffer used to compute the cross
-								///< correlation between the recorded sample and
-								///< the acquired signal fft from the microphone,
-								///< allocated here to avoid too much allocation
-								///< on the stack
-								///< NOTE: this attribute MUST be the last one
 } audio_file_desc_t;
 
 /// Status of the resources used to record audio
@@ -173,6 +164,15 @@ typedef struct __AUDIO_FFT_STRUCT
 
 } audio_fft_t;
 
+/// Structure that contains a cab used by the unnormalized_cross_correlation()
+/// function
+typedef struct __AUDIO_ANALYSIS_STRUCT
+{
+	double buffers[AUDIO_MAX_FILES][AUDIO_DESIRED_PADBUFFER_SIZE];
+								///< Buffers used within the cab
+	ptask_cab_t cab;			///< The CAB is used as a buffer pool
+} audio_analysis_t;
+
 /// Global state of the module
 typedef struct __AUDIO_STRUCT
 {
@@ -187,7 +187,10 @@ typedef struct __AUDIO_STRUCT
 	audio_record_t record;		///< Contains all the data needed to record
 
 	audio_fft_t fft;			///< Contains all the data needed to perform
-								///< FFT analysis
+								///< FFT and IFFT
+
+	audio_analysis_t analysis;	///< Contains all the data needed to perform
+								///< analysis of FFTs
 
 	ptask_mutex_t mutex;		///< TODO: Right now accesses to this data
 								///< structure are not protected (enough).
@@ -214,19 +217,16 @@ void audio_file_copy(audio_file_desc_t *dest, const audio_file_desc_t*src)
 {
 	if (src->has_rec)
 	{
-		// TODO: change this when that array is removed
-		// I need to copy all the arrays anyway, but I can skip the
-		// cross_corr_buffer, which will be the last element
-		memcpy(dest, src, offsetof(audio_file_desc_t, cross_corr_buffer));
+		*dest = *src;
 	}
 	else
 	{
 		// I can skip copying the big arrays
 		dest->datap		= src->datap;
 		dest->type		= src->type;
-		dest->volume	= src->type;
-		dest->panning	= src->type;
-		dest->frequency	= src->type;
+		dest->volume	= src->volume;
+		dest->panning	= src->panning;
+		dest->frequency	= src->frequency;
 		dest->has_rec	= src->has_rec;
 		strcpy(dest->filename, src->filename);
 	}
@@ -583,6 +583,33 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
 }
 
 /**
+ * Initializes analysis data structure.
+ */
+static inline int analysis_init()
+{
+int err;
+int index;
+
+// FIXME: normalize use of AUDIO_MAX_FILES and AUDIO_NUM_BUFFERS constants
+void *cab_pointers[AUDIO_MAX_FILES];	// Pointers to buffers used in cab library
+
+	// Construction of CAB pointers for analysis buffers
+	for (index = 0; index < AUDIO_MAX_FILES; ++index)
+	{
+		cab_pointers[index] = STATIC_CAST(void*, audio_state.analysis.buffers[index]);
+	}
+
+	// Initializing FFT CAB buffers, the pointers are copied to the cab
+	// structure
+	err = ptask_cab_init(&audio_state.analysis.cab,
+						 AUDIO_NUM_BUFFERS,
+						 AUDIO_DESIRED_PADBUFFER_SIZE,
+						 cab_pointers);
+
+	return err;
+}
+
+/**
  * Prepares the microphone to record. Returns 0 on success, less than zero on
  * error.
  * TODO: check what are the return values.
@@ -701,6 +728,10 @@ fftw_plan fft_plan_inverse;		// The FFTW3 plan used to compute the inverse FFT
 
 	// FFTW3 initialization
 	err = fft_init(rframes, &fft_plan, &fft_plan_inverse);
+	if (err) return err;
+
+	// Analysis data structures initialization
+	err = analysis_init();
 	if (err) return err;
 
 	// Copy local vales to global structures
@@ -1347,21 +1378,30 @@ double m = v[0];
 	return m;
 }
 
-double unnormalized_cross_correlation(double *buffer,
-	const double *first_fft, const double *second_fft)
+double unnormalized_cross_correlation(const double *first_fft, const double *second_fft)
 {
+double *buffer;
+ptask_cab_id_t index;
+
+	// Cannot fail
+	ptask_cab_reserve(&audio_state.analysis.cab,
+		STATIC_CAST(void **, &buffer),
+		&index);
+
 	cross_correlation(buffer, first_fft, second_fft);
 
 	double correlation_value = max(buffer, audio_state.fft.rframes);
 
+	ptask_cab_unget(&audio_state.analysis.cab, index);
+
 	return correlation_value;
 }
 
-double normalized_cross_correlation(double* buffer,
+double normalized_cross_correlation(
 	const double *first_fft, const double *second_fft,
 	double first_autocorr, double second_autocorr)
 {
-	double unnormalized = unnormalized_cross_correlation(buffer, first_fft, second_fft);
+	double unnormalized = unnormalized_cross_correlation(first_fft, second_fft);
 
 	return (unnormalized * unnormalized) / (first_autocorr * second_autocorr);
 }
@@ -1433,23 +1473,10 @@ int err;
 	// Calculate autocorrelation once for later use, defined as the
 	// cross-correlation with itself
 	audio_state.audio_files[i].autocorr = unnormalized_cross_correlation(
-		audio_state.audio_files[i].cross_corr_buffer,
 		audio_state.audio_files[i].recorded_fft,
 		audio_state.audio_files[i].recorded_fft
 	);
 
-	// TODO: remove this check
-	/*
-	double watch0 = normalized_cross_correlation(
-		audio_state.audio_files[i].cross_corr_buffer,
-		audio_state.audio_files[i].recorded_fft,
-		audio_state.audio_files[i].recorded_fft,
-		audio_state.audio_files[i].autocorr,
-		audio_state.audio_files[i].autocorr
-	);
-
-	printf("The normalized cross-correlation with itself is %f!\r\n", watch0);
-	*/
 	return 0;
 }
 
@@ -1683,7 +1710,6 @@ fft_output_t *out_pointer;
 
 			// TODO: Should calculate its autocorrelation and publish that too somewhere, along with the fft
 			out_pointer->autocorr = unnormalized_cross_correlation(
-				cross_corr_buffer,
 				out_buffer,
 				out_buffer
 			);
@@ -1779,11 +1805,10 @@ double correlation;
 			last_timestamp = new_timestamp;
 
 			correlation = normalized_cross_correlation(
-				audio_state.audio_files[file_index].cross_corr_buffer,
 				audio_state.audio_files[file_index].recorded_fft,
 				fft_ptr->fft,
 				audio_state.audio_files[file_index].autocorr,
-				fft_ptr->autocorr // the autocorrelation of last fft (which should be computed by the fft task)
+				fft_ptr->autocorr
 			);
 
 			// printf("Correlation with file %d is %f .\r\n", file_index+1, correlation);
