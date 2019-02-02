@@ -364,17 +364,16 @@ int num, i;
  */
 int fft_average_to_height(double average) {
 // TODO: magic numbers
-#define DB_MINIMUM	(-10.)
-#define DB_MAXIMUM	(100)
+#define DB_MINIMUM	(-10.) ///< Minimum value of deciBel displayed, less than this is zero pixels high
+#define DB_MAXIMUM	(100) ///< Maximum value of deciBel displayed, more than this is saturated
 
 int num_pixels;
 
-	double value_log = 20*log10f(average);
+	double value_log = (average > 0.) ? 20*log10f(average) : DB_MINIMUM;
 
 	if (value_log < DB_MINIMUM)
 		value_log = DB_MINIMUM;
-
-	if (value_log > DB_MAXIMUM)
+	else if (value_log > DB_MAXIMUM)
 		value_log = DB_MAXIMUM;
 
 	num_pixels = STATIC_CAST(int, (value_log-DB_MINIMUM) / (DB_MAXIMUM - DB_MINIMUM) * FFT_PLOT_HEIGHT);

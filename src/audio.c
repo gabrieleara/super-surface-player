@@ -133,6 +133,10 @@ typedef struct __AUDIO_RECORD_STRUCT
 	ptask_cab_t cab;			///< CAB used to handle allocated buffers
 } audio_record_t;
 
+/**
+ * Structure used to publish a new FFT obtained from continuous microphone
+ * recording.
+ */
 typedef struct __FFT_OUTPUT
 {
 	double autocorr;			///< The autocorrelation of the given sample
@@ -958,6 +962,70 @@ static inline int playback_stop()
 	return snd_pcm_drain(audio_state.record.playback_handle);
 }
 
+/**
+ * Record an audio sample in the specified buffer. This function starts the
+ * microphone to record, collects data and waits for the microphone to stop
+ * when done.
+ */
+static inline int record_sample(short* buffer)
+{
+int err;
+
+	// Preparing the microphone interface to be used
+	err = mic_prepare();
+	if (err)
+	{
+		if (verbose())
+			printf("Could not prepare the microphone for audio acquisition.\r\n");
+		return err;
+	}
+
+	err = mic_read_blocking(buffer, audio_state.record.rframes);
+	if (err)
+	{
+		if (verbose())
+			printf("Could not record properly the trigger sample!\r\n");
+		return err;
+	}
+
+	// Stop recording
+	err = mic_stop();
+	if (err)
+	{
+		if (verbose())
+			printf("Could not properly stop the microphone acquisition!\r\n");
+		return err;
+	}
+
+	return 0;
+}
+
+/**
+ * Play the given buffer on the default alsa playback handle, waiting for its
+ * completion too.
+ * The handle needs to be prepared first.
+ * Returns zero on success, a non-zero value otherwise.
+ */
+static inline int playback_buffer_blocking(short* buffer, int size)
+{
+int remaining = size;
+int err;
+
+	while (remaining > 0)
+	{
+		err = snd_pcm_writei(audio_state.record.playback_handle,
+			buffer,
+			remaining);
+
+		if (err < 0)
+			abort_on_error("Could not play the recorded sample!");
+
+		remaining -= err;
+	}
+
+	return 0;
+}
+
 
 //@}
 
@@ -1195,13 +1263,6 @@ int audio_get_fft_rframes() {
 	return audio_state.fft.rframes;
 }
 
-int audio_get_num_files()
-{
-	// Safe since the number of opened files cannot be modified in multithreaded
-	// environment
-	return audio_state.audio_files_opened;
-}
-
 int audio_file_get_volume(int i)
 {
 int ret;
@@ -1263,7 +1324,7 @@ audio_type_t audio_file_type(int i)
 
 // -------------- SETTERS --------------
 
-void audio_set_volume(int i, int val)
+void audio_file_set_volume(int i, int val)
 {
 	val = val < MIN_VOL ? MIN_VOL : val > MAX_VOL ? MAX_VOL : val;
 
@@ -1277,7 +1338,7 @@ void audio_set_volume(int i, int val)
 	ptask_mutex_unlock(&audio_state.mutex);
 }
 
-void audio_set_panning(int i, int val)
+void audio_file_set_panning(int i, int val)
 {
 
 	val = val < CLX_PAN ? CLX_PAN : val > CRX_PAN ? CRX_PAN : val;
@@ -1292,7 +1353,7 @@ void audio_set_panning(int i, int val)
 	ptask_mutex_unlock(&audio_state.mutex);
 }
 
-void audio_set_frequency(int i, int val)
+void audio_file_set_frequency(int i, int val)
 {
 	val *= 10;
 
@@ -1447,39 +1508,6 @@ void audio_free_last_fft(int buffer_index)
 	ptask_cab_unget(&audio_state.fft.cab, buffer_index);
 }
 
-int record_sample(short* buffer)
-{
-int err;
-
-	// Preparing the microphone interface to be used
-	err = mic_prepare();
-	if (err)
-	{
-		if (verbose())
-			printf("Could not prepare the microphone for audio acquisition.\r\n");
-		return err;
-	}
-
-	err = mic_read_blocking(buffer, audio_state.record.rframes);
-	if (err)
-	{
-		if (verbose())
-			printf("Could not record properly the trigger sample!\r\n");
-		return err;
-	}
-
-	// Stop recording
-	err = mic_stop();
-	if (err)
-	{
-		if (verbose())
-			printf("Could not properly stop the microphone acquisition!\r\n");
-		return err;
-	}
-
-	return 0;
-}
-
 int audio_file_record_sample_to_play(int i)
 {
 int err;
@@ -1517,32 +1545,6 @@ int err;
 		audio_state.audio_files[i].recorded_fft,
 		audio_state.audio_files[i].recorded_fft
 	);
-
-	return 0;
-}
-
-/**
- * Play the given buffer on the default alsa playback handle, waiting for its
- * completion too.
- * The handle needs to be prepared first.
- * Returns zero on success, a non-zero value otherwise.
- */
-static inline int playback_buffer_blocking(short* buffer, int size)
-{
-int remaining = size;
-int err;
-
-	while (remaining > 0)
-	{
-		err = snd_pcm_writei(audio_state.record.playback_handle,
-			buffer,
-			remaining);
-
-		if (err < 0)
-			abort_on_error("Could not play the recorded sample!");
-
-		remaining -= err;
-	}
 
 	return 0;
 }
