@@ -100,6 +100,9 @@ bool wcet_analysis()
 	return main_state.log_level & LOG_WCET;
 }
 
+/**
+ * Returns the log level mask of the system.
+ */
 int log_level()
 {
 	return main_state.log_level;

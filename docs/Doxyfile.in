@@ -2,7 +2,9 @@ INPUT                   = .
 RECURSIVE               = YES
 EXCLUDE                 =
 ENABLE_PREPROCESSING    = YES
-PREDEFINED              = DOXYGEN_SHOULD_SKIP_THIS
+MACRO_EXPANSION         = YES
+EXPAND_ONLY_PREDEF      = YES
+PREDEFINED              = DOXYGEN_SHOULD_SKIP_THIS __attribute__(x)=
 JAVADOC_AUTOBRIEF       = YES
 EXTRACT_STATIC          = YES
 OUTPUT_DIRECTORY        = dist/docs
