@@ -18,6 +18,9 @@
 #define MAX_CHAR_BUFFER_SIZE	(256)	///< Size of any char buffer used in the system
 #define MAX_DIRECTORY_LENGTH	(256)	///< Maximum length of a directory name
 
+#define LOG_VERBOSE				(0x01)	///< Verbose logging enabled
+#define LOG_WCET				(0x02)	///< WCET logging enabled
+
 // -----------------------------------------------------------------------------
 //                           RECORDING CONSTANTS
 // -----------------------------------------------------------------------------

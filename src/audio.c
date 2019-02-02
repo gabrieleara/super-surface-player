@@ -192,11 +192,8 @@ typedef struct __AUDIO_STRUCT
 	audio_analysis_t analysis;	///< Contains all the data needed to perform
 								///< analysis of FFTs
 
-	ptask_mutex_t mutex;		///< TODO: Right now accesses to this data
-								///< structure are not protected (enough).
-								///< A security check shall be performed to be
-								///< sure that each new code does not collide
-								///< with the old one.
+	ptask_mutex_t mutex;		///< Protrects access to opened files attributes
+								///< in multithreaded environment.
 } audio_state_t;
 
 
@@ -472,7 +469,6 @@ int s = 0;
  * Waits for the given amount of seconds, printing a countdown on the standard
  * output every second, followed by an exclamation mark when the countdown is
  * finished.
- * TODO: move
  */
 static inline void wait_seconds_print(int nseconds)
 {
@@ -533,7 +529,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	err = snd_pcm_open(&alsa_handle, "default", stream_direction, mode);
 	if (err < 0)
 	{
-		if (verbose())	printf("Failed to open ALSA PCM default device.\r\n");
+		print_log(LOG_VERBOSE, "Failed to open ALSA PCM default device.\r\n");
 		return err;
 	}
 
@@ -541,7 +537,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	err = snd_pcm_hw_params_malloc(&hw_params);
 	if (err < 0)
 	{
-		if (verbose())	printf("Failed to malloc ALSA params.\r\n");
+		print_log(LOG_VERBOSE, "Failed to malloc ALSA params.\r\n");
 		return err;
 	}
 
@@ -549,7 +545,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	err = snd_pcm_hw_params_any(alsa_handle, hw_params);
 	if (err < 0)
 	{
-		if (verbose())	printf("Failed to fill params with default values.\r\n");
+		print_log(LOG_VERBOSE, "Failed to fill params with default values.\r\n");
 		return err;
 	}
 
@@ -560,7 +556,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 									   SND_PCM_ACCESS_RW_INTERLEAVED);
 	if (err < 0)
 	{
-		if (verbose())	printf("Failed to set interleaved mode on ALSA PCM.\r\n");
+		print_log(LOG_VERBOSE, "Failed to set interleaved mode on ALSA PCM.\r\n");
 		return err;
 	}
 
@@ -569,7 +565,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 									   SND_PCM_FORMAT_S16_LE);
 	if (err < 0)
 	{
-		if (verbose())	printf("Failed to set 16bit LE format on ALSA PCM.\r\n");
+		print_log(LOG_VERBOSE, "Failed to set 16bit LE format on ALSA PCM.\r\n");
 		return err;
 	}
 
@@ -579,7 +575,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	err = snd_pcm_hw_params_set_rate_near(alsa_handle, hw_params, &rrate, 0);
 	if (err < 0)
 	{
-		if (verbose())	printf("Failed to set sampling rate on ALSA PCM.\r\n");
+		print_log(LOG_VERBOSE, "Failed to set sampling rate on ALSA PCM.\r\n");
 		return err;
 	}
 
@@ -587,7 +583,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	err = snd_pcm_hw_params_set_channels(alsa_handle, hw_params, 1);
 	if (err < 0)
 	{
-		if (verbose())	printf("Failed to set mono channel on ALSA PCM.\r\n");
+		print_log(LOG_VERBOSE, "Failed to set mono channel on ALSA PCM.\r\n");
 		return err;
 	}
 
@@ -598,7 +594,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 												 &rframes, 0);
 	if (err < 0)
 	{
-		if (verbose())	printf("Failed to set period on ALSA PCM.\r\n");
+		print_log(LOG_VERBOSE, "Failed to set period on ALSA PCM.\r\n");
 		return err;
 	}
 
@@ -606,7 +602,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	err = snd_pcm_hw_params(alsa_handle, hw_params);
 	if (err < 0)
 	{
-		if (verbose())	printf("Failed to write params to ALSA PCM device.\r\n");
+		print_log(LOG_VERBOSE, "Failed to write params to ALSA PCM device.\r\n");
 		return err;
 	}
 
@@ -625,7 +621,13 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 
 /**
  * Initialize ALSA recorder handle.
- * TODO: document arguments
+ * Arguments are pointers to following variables:
+ *  - A pointer to an alsa snd_pcm_t handle, that will be overwritten;
+ *  - The desired acquisition rate, which will be substituted with the actual
+ *    acquisition rate.
+ *  - The desired number of frames per window, which will be substituted with
+ *    the actual number of frames per window accepted by ALSA.
+ * Returns zero on success, non zero otherwise.
  */
 int install_alsa_recorder(snd_pcm_t **record_handle_ptr,
 	unsigned int *rrate_ptr, snd_pcm_uframes_t *rframes_ptr)
@@ -636,7 +638,14 @@ int install_alsa_recorder(snd_pcm_t **record_handle_ptr,
 
 /**
  * Initialize ALSA playback handle.
- * TODO: document arguments
+ * Arguments are pointers to following variables:
+ *  - A pointer to an alsa snd_pcm_t handle, that will be overwritten;
+ *  - The desired playback rate, which will be substituted with the actual
+ *    playback rate (assuming this will be equal to the acqual acquisition rate
+ *    obtained from install_alsa_recorder()).
+ *  - The desired number of frames per window, which will be substituted with
+ *    the actual number of frames per window accepted by ALSA.
+ * Returns zero on success, non zero otherwise.
  */
 int install_alsa_playback(snd_pcm_t **playback_handle_ptr,
 	unsigned int *rrate_ptr, snd_pcm_uframes_t *rframes_ptr)
@@ -802,7 +811,6 @@ void *cab_pointers[AUDIO_MAX_FILES];	// Pointers to buffers used in cab library
 /**
  * Prepares the microphone to record. Returns 0 on success, less than zero on
  * error.
- * TODO: check what are the return values.
  */
 static inline int mic_prepare()
 {
@@ -835,10 +843,10 @@ int err;
 /**
  * Reads microphone data if available, blocking until the number of frames that
  * is requested is not available yet.
+ * This function assumes the microphone has been already prepared with
+ * mic_prepare().
  * It returns zero on success, a non zero value on failure.
- * TODO: add more to this documentation if the function is actually used.
- * TODO: actually probably this function will be used while in single-thread text mode.
-*/
+ */
 static inline int mic_read_blocking(short* buffer, const int nframes)
 {
 int err;
@@ -863,22 +871,18 @@ int missing = nframes;	// How many frames are still missing
 				// See after the switch block
 				break;
 			case -EBADFD:
-				if (verbose())
-					printf("ALSA device was not in correct state.");
+				print_log(LOG_VERBOSE, "ALSA device was not in correct state.");
 				return err;
 			case -EPIPE:
 				// NOTICE: Could implement some code to recover from this state
-				if (verbose())
-					printf("Overrun in ALSA microphone handling.");
+				print_log(LOG_VERBOSE, "Overrun in ALSA microphone handling.");
 				return err;
 			case -ESTRPIPE:
 				// NOTICE: Could implement some code to recover from this state
-				if (verbose())
-					printf("ALSA suspend event occurred.");
+				print_log(LOG_VERBOSE, "ALSA suspend event occurred.");
 				return err;
 			default:
-				if (verbose())
-					printf("ALSA unexpected error in blocking recording!");
+				print_log(LOG_VERBOSE, "ALSA unexpected error in blocking recording!");
 				return err;
 			}
 #else
@@ -936,7 +940,6 @@ int missing = nframes;	// How many frames are still missing
  * Stops the microphone, dropping immediately any buffered frame.
  * It is used when it's sure that no further frame will be needed from now
  * until the next prepare.
- * TODO: check what are the return values.
  */
 static inline int mic_stop()
 {
@@ -946,7 +949,6 @@ static inline int mic_stop()
 /**
  * Prepares the alsa playback handle to play a recorded sample.
  * Returns 0 on success, less than zero on error.
- * TODO: check what are the return values.
  */
 static inline int playback_prepare()
 {
@@ -975,16 +977,14 @@ int err;
 	err = mic_prepare();
 	if (err)
 	{
-		if (verbose())
-			printf("Could not prepare the microphone for audio acquisition.\r\n");
+		print_log(LOG_VERBOSE, "Could not prepare the microphone for audio acquisition.\r\n");
 		return err;
 	}
 
 	err = mic_read_blocking(buffer, audio_state.record.rframes);
 	if (err)
 	{
-		if (verbose())
-			printf("Could not record properly the trigger sample!\r\n");
+		print_log(LOG_VERBOSE, "Could not record properly the trigger sample!\r\n");
 		return err;
 	}
 
@@ -992,8 +992,7 @@ int err;
 	err = mic_stop();
 	if (err)
 	{
-		if (verbose())
-			printf("Could not properly stop the microphone acquisition!\r\n");
+		print_log(LOG_VERBOSE, "Could not properly stop the microphone acquisition!\r\n");
 		return err;
 	}
 
@@ -1192,6 +1191,7 @@ audio_file_desc_t	file;
 	{
 		ptask_mutex_lock(&audio_state.mutex);
 
+		// Copy file attributes in critical section (volume, panning, etc.)
 		file = audio_state.audio_files[i];
 
 		ptask_mutex_unlock(&audio_state.mutex);
@@ -1227,7 +1227,6 @@ audio_file_desc_t	file;
 
 	return err;
 }
-
 
 void audio_stop()
 {
@@ -1514,8 +1513,7 @@ int err;
 
 	if (!audio_file_is_open(i))
 	{
-		if (verbose())
-			printf("The specified audio file index is invalid!\r\n");
+		print_log(LOG_VERBOSE, "The specified audio file index is invalid!\r\n");
 		return EINVAL;
 	}
 
@@ -1549,8 +1547,6 @@ int err;
 	return 0;
 }
 
-
-// TODO: move
 void audio_file_play_recorded_sample(int i)
 {
 int err;
@@ -1742,7 +1738,6 @@ fft_output_t *out_pointer;
 			// current buffer (potentially zero-padded)
 			fft(out_buffer);
 
-			// TODO: Should calculate its autocorrelation and publish that too somewhere, along with the fft
 			out_pointer->autocorr = correlation_non_normalized(
 				out_buffer,
 				out_buffer
@@ -1783,31 +1778,20 @@ ptask_t *tp; // task pointer
 // int task_id; // task identifier
 
 // Local variables
-// int err;
-
 struct timespec last_timestamp = { .tv_sec = 0, .tv_nsec = 0};
 						// Timestamp of last accessed input buffer
 struct timespec new_timestamp;
 						// Timestamp of the new input buffer
 
-// int in_buffer_index;	// Index of local buffer used to get microphone data
-// const double *in_buffer;	// Pointer to local input buffer
-
-// TODO: there is no out buffer, but there may be a local copy
-
-// unsigned int i;			// Index used to copy data
 int file_index;			// Index of the file that has been associated with this task
 
 	tp = STATIC_CAST(ptask_t *, arg);
 	// task_id = ptask_get_id(tp);
 
+	// Variables initialization and initial computation
+
 	// Get the associated file index as it is the only argument
 	file_index = *STATIC_CAST(int*, &tp->args);
-
-	// TODO: log function
-	// printf("Started an analyzer task for the file of index %d!\r\n", file_index);
-
-	// Variables initialization and initial computation
 
 	ptask_start_period(tp);
 
@@ -1818,8 +1802,6 @@ double correlation;
 
 	while (!main_get_tasks_terminate())
 	{
-		// TODO: DO STUFF
-		// TODO: check timestamp too
 		err = ptask_cab_getmes(&audio_state.fft.cab,
 			STATIC_CAST(const void **, &fft_ptr),
 			&buffer_id,
@@ -1829,13 +1811,6 @@ double correlation;
 		// If the acquired buffer has not been analyzed yet
 		if (err != EAGAIN && time_cmp(last_timestamp, new_timestamp) < 0)
 		{
-			/*
-			struct timespec prova;
-			time_diff(&prova, new_timestamp, last_timestamp);
-
-			printf("TASL_ALS since last FFT: %lld.%.9ld seconds.\r\n", (long long)prova.tv_sec, prova.tv_nsec);
-			*/
-
 			last_timestamp = new_timestamp;
 
 			correlation = correlation_normalized(			audio_state.audio_files[file_index].recorded_fft,
@@ -1844,7 +1819,7 @@ double correlation;
 				fft_ptr->autocorr
 			);
 
-			// printf("Correlation with file %d is %f .\r\n", file_index+1, correlation);
+			print_log(LOG_VERBOSE, "Correlation with file %d is %f .\r\n", file_index+1, correlation);
 
 			// TODO: magic number
 			if (fabs(correlation) > 0.35) {

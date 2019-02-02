@@ -54,8 +54,7 @@ typedef struct __MAIN_STRUCT
 	bool			tasks_terminate;///< Tells if concurrent tasks should stop
 									///< their execution
 	bool			quit;			///< Tells if the program is shutting down
-	bool			verbose;		///< Tells if the verbose flag has been set
-	bool			wcet_analysis;	///< Tells if the wcet analysis flag as been set
+	bool			log_level;		///< The system log level
 	char			directory[MAX_DIRECTORY_LENGTH];
 									///< The specified directory where to search
 									///< for audio files (also referred as the
@@ -78,12 +77,11 @@ static main_state_t main_state =
 	.tasks_terminate	= false,
 	.quit				= false,
 #ifdef NDEBUG
-	.verbose			= false,
+	.log_level			= 0,
 #else
 	// In debug it is automatically verbose
-	.verbose			= true,
+	.log_level			= LOG_VERBOSE,
 #endif
-	.wcet_analysis		= false,
 	.directory			= "",
 };
 
@@ -94,12 +92,28 @@ static main_state_t main_state =
 
 bool verbose()
 {
-	return main_state.verbose;
+	return main_state.log_level & LOG_VERBOSE;
 }
 
 bool wcet_analysis()
 {
-	return main_state.wcet_analysis;
+	return main_state.log_level & LOG_WCET;
+}
+
+int log_level()
+{
+	return main_state.log_level;
+}
+
+void print_log(int level, const char* format, ...)
+{
+	va_list args;
+	va_start(args, format);
+
+	if(log_level() & level)
+		vprintf(format, args);
+
+	va_end(args);
 }
 
 char* working_directory()
@@ -171,20 +185,20 @@ int err = 0;
 	// NOTE: Even if it is implemented, the wcet_analysis command does actually nothing
 	case 'v':
 #ifdef NDEBUG
-		if (main_state.verbose)
+		if (verbose())
 			err = EINVAL;
 		else
 #endif
 			// In debug mode it is automatically verbose, and errors due to
 			// repeated flags are not checked
-			main_state.verbose = true;
+			main_state.log_level |= LOG_VERBOSE;
 		break;
 
 	case 'w':
-		if (main_state.wcet_analysis)
+		if (wcet_analysis())
 			err = EINVAL;
 		else
-			main_state.wcet_analysis = true;
+			main_state.log_level |= LOG_WCET;
 		break;
 
 	// NOTE: More command line arguments may be placed.
@@ -775,7 +789,6 @@ static inline int start_fft_task()
 
 /**
  * Initializes and starts the analyzer task, returning zero on success.
- * TODO: it may be necessary to start many of these
  */
 static inline int start_analyzer_tasks()
 {
@@ -801,19 +814,6 @@ int num_recording_files = 0;
 		}
 	}
 
-	// TODO: This task should be divided between multiple tasks, one for each
-	// opened file with an associated record trigger.
-
-	/*
-	return
-		ptask_short(
-			&main_state.tasks[TASK_ALS],
-			TASK_ALS_WCET,
-			TASK_ALS_PERIOD,
-			TASK_ALS_DEADLINE,
-			GET_PRIO(TASK_ALS_PRIORITY),
-			analyzer_task);
-	*/
 	return 0;
 }
 
@@ -861,12 +861,6 @@ int err;
  */
 static inline void join_tasks()
 {
-// TODO: Update this function to reflect new tasks organization.
-
-// int i;
-	// for (i = 0; i < TASK_NUM; ++i)
-	// 	ptask_join(&main_state.tasks[i]);
-
 	ptask_join(&main_state.tasks[TASK_UI]);
 	ptask_join(&main_state.tasks[TASK_GUI]);
 	ptask_join(&main_state.tasks[TASK_MIC]);

@@ -667,11 +667,9 @@ int amplitude;			// The height of the most recent computed amplitude
 
 /**
  * Calls Allegro show_mouse(screen) if the mouse module has been initialized,
- * but only once at first run each time the window is created.
- *
- * TODO: rename this one.
+ * but only once at first run, each time the window is created.
  */
-static inline void my_show_mouse()
+static inline void init_show_mouse()
 {
 bool result;
 
@@ -705,7 +703,7 @@ static inline void screen_refresh()
 	// copy the virtual screen on the actual screen variable
 	blit(gui_state.virtual_screen, screen, 0, 0, 0, 0, WIN_MX, WIN_MY);
 
-	my_show_mouse();
+	init_show_mouse();
 }
 
 /**
