@@ -371,7 +371,7 @@
 /// The maximum height of the time plot content
 #define TIME_MAX_HEIGHT		((TIME_PLOT_HEIGHT - 1 - (2 * TIME_P)))
 /// The amplitude which corresponds to the maximum height
-#define TIME_MAX_AMPLITUDE	(1000000)
+#define TIME_MAX_AMPLITUDE	(100000000)
 
 
 

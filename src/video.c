@@ -267,11 +267,11 @@ int		value;		// Value where to store
 	textout_ex(
 		gui_state.virtual_screen,
 		font,
-		audio_get_filename(index),
+		audio_file_name(index),
 		SIDE_ELEM_NAME_X, posy+SIDE_ELEM_NAME_Y,
 		COLOR_TEXT_PRIM, COLOR_BKG);
 
-	value = audio_get_volume(index);
+	value = audio_file_get_volume(index);
 
 	sprintf(buffer, "%d", value);
 	textout_ex(
@@ -281,7 +281,7 @@ int		value;		// Value where to store
 		SIDE_ELEM_VOL_X, posy+SIDE_ELEM_VAL_Y,
 		COLOR_TEXT_PRIM, COLOR_WHITE);
 
-	value = audio_get_panning(index);
+	value = audio_file_get_panning(index);
 
 	sprintf(buffer, "%d", value);
 	textout_ex(
@@ -291,7 +291,7 @@ int		value;		// Value where to store
 		SIDE_ELEM_PAN_X, posy+SIDE_ELEM_VAL_Y,
 		COLOR_TEXT_PRIM, COLOR_WHITE);
 
-	value = audio_get_frequency(index);
+	value = audio_file_get_frequency(index);
 
 	sprintf(buffer, "%d", value);
 	textout_ex(gui_state.virtual_screen, font, buffer,
@@ -318,7 +318,7 @@ int posx, posy;	// Starting point where to draw the given element
 	textout_ex(
 		gui_state.virtual_screen,
 		font,
-		audio_get_filename(index),
+		audio_file_name(index),
 		SIDE_ELEM_NAME_X, posy+SIDE_ELEM_NAME_Y,
 		COLOR_TEXT_PRIM, COLOR_BKG);
 }
@@ -328,7 +328,7 @@ int posx, posy;	// Starting point where to draw the given element
  */
 static inline void draw_side_element(int index)
 {
-	switch (audio_get_type(index))
+	switch (audio_file_type(index))
 	{
 	case AUDIO_TYPE_SAMPLE:
 		draw_side_element_sample(index);
@@ -350,7 +350,7 @@ static inline void draw_sidebar()
 {
 int num, i;
 
-	num = audio_get_num_files();
+	num = audio_file_num_opened();
 
 	for (i = 0; i < num; ++i)
 	{
@@ -363,13 +363,48 @@ int num, i;
  * TODO: plot in dB!
  */
 int fft_average_to_height(double average) {
-	average = average/1000;
+// TODO: magic numbers
+#define DB_MINIMUM	(-10.)
+#define DB_MAXIMUM	(100)
 
-	if (average > FFT_PLOT_HEIGHT)
+int num_pixels;
+
+	double value_log = 20*log10f(average);
+
+	if (value_log < DB_MINIMUM)
+		value_log = DB_MINIMUM;
+
+	if (value_log > DB_MAXIMUM)
+		value_log = DB_MAXIMUM;
+
+	num_pixels = STATIC_CAST(int, (value_log-DB_MINIMUM) / (DB_MAXIMUM - DB_MINIMUM) * FFT_PLOT_HEIGHT);
+
+	if (num_pixels > FFT_PLOT_HEIGHT)
 		return FFT_PLOT_HEIGHT;
 
-	return average;
+	if (num_pixels < 0)
+		return 0;
+
+	return num_pixels;
 }
+
+/*
+static inline void max_min_amplitude(const double amplitudes[], const int frames,
+	double *maximum_ptr, double *minimum_ptr)
+{
+int i;
+	*maximum_ptr = *minimum_ptr = amplitudes[0];
+
+	for (i = 1; i < frames;++i)
+	{
+		if (amplitudes[i] > *maximum_ptr)
+			*maximum_ptr = amplitudes[i];
+		else if (amplitudes[i] < *minimum_ptr)
+			*minimum_ptr = amplitudes[i];
+	}
+
+}
+*/
 
 /**
  * Draws the actual fft plot, given the array of amplitudes associated with each
@@ -404,8 +439,12 @@ int last_index;				// The index of the last frequency (partially)
 int pixel_offset;			// The offset of the current pixel within the FFT plot
 int i;
 
+// double maximum, minimum;
+
 	frame_window_per_pixel = STATIC_CAST(double,frames) /
 		STATIC_CAST(double,FFT_PLOT_WIDTH);
+
+	// max_min_amplitude(amplitudes, frames, &maximum, &minimum);
 
 	// Initializing variables for first iteration.
 	// The loop uses some optimizations to avoid calculating multiple times
@@ -414,6 +453,9 @@ int i;
 	last_weight	= 0.;	// Values exactly on the edge of a window are considered
 						// fully part of the subsequent window. Example: index 0
 						// has always weight 1.
+
+	// The first frequency here is NOT the zero frequency, it's the first, thus
+	// this is okay.
 	last_index	= 0;
 
 	// For each pixel of the plot
@@ -465,6 +507,7 @@ static double amplitudes[AUDIO_DESIRED_HALFCOMPLEX];
 int rrate;				// Actual acquisition rate
 int rframes;			// Number of frames per audio sample, which is also the
 						// number of values within the fft buffer
+int i;
 
 	rrate	= audio_get_fft_rrate();
 	rframes = audio_get_last_fft(&buffer, &buffer_index);
@@ -483,11 +526,11 @@ int rframes;			// Number of frames per audio sample, which is also the
 	// Translating from half-complex notation of the fft to magnitudes only.
 	// To the real value of index i (one-based), the corresponding complex value
 	// is the N-ith value, where N is the total length of the fft array
-	for (int i = 1; i <= number_frames; ++i) {
+	for (i = 1; i <= number_frames; ++i) {
 		amplitudes[i-1] = sqrt(
 			buffer[i] * buffer[i] +
 			buffer[rframes-i] * buffer[rframes-i]
-		);
+		) / rframes; // Division needed for normalization
 	}
 
 	// We don't need the original buffer anymore
@@ -686,9 +729,9 @@ static inline void handle_num_key(int num)
 {
 	num = num == 0 ? 9 : num-1;
 
-	if (num < audio_get_num_files())
+	if (num < audio_file_num_opened())
 	{
-		audio_play_file(num);
+		audio_file_play(num);
 	}
 }
 
@@ -815,25 +858,25 @@ static inline void handle_click(int button_id, int element_id)
 	switch(button_id)
 	{
 	case BUTTON_PLAY:
-		audio_play_file(element_id);
+		audio_file_play(element_id);
 		break;
 	case BUTTON_VOL_UP:
-		audio_volume_up(element_id);
+		audio_file_volume_up(element_id);
 		break;
 	case BUTTON_VOL_DOWN:
-		audio_volume_down(element_id);
+		audio_file_volume_down(element_id);
 		break;
 	case BUTTON_PAN_UP:
-		audio_panning_up(element_id);
+		audio_file_panning_up(element_id);
 		break;
 	case BUTTON_PAN_DOWN:
-		audio_panning_down(element_id);
+		audio_file_panning_down(element_id);
 		break;
 	case BUTTON_FRQ_UP:
-		audio_frequency_up(element_id);
+		audio_file_frequency_up(element_id);
 		break;
 	case BUTTON_FRQ_DOWN:
-		audio_frequency_down(element_id);
+		audio_file_frequency_down(element_id);
 		break;
 	default:
 		// Do nothing

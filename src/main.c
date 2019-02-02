@@ -381,7 +381,7 @@ int		err = 0;
 		strncpy(buffer, filename, sizeof(buffer));
 	}
 
-	err = audio_open_file(buffer);
+	err = audio_file_open(buffer);
 
 	if (err)
 	{
@@ -412,7 +412,7 @@ int err;
 
 	// File numbers are specified as listed by the audio_list_fles,
 	// but are played using zero based indexes.
-	err = audio_play_file(fnum-1);
+	err = audio_file_play(fnum-1);
 
 	if (err)
 	{
@@ -429,7 +429,7 @@ int err;
 
 	// File numbers are specified as listed by the audio_list_fles,
 	// but are played using zero based indexes.
-	err = audio_close_file(fnum-1);
+	err = audio_file_close(fnum-1);
 
 	if (err)
 	{
@@ -481,13 +481,13 @@ static inline void cmd_list_audio_files()
 {
 int i;
 
-	if (!audio_get_num_files())
+	if (!audio_file_num_opened())
 	{
 		printf("No audio files are opened.\r\n");
 	}
 	else
 	{
-		for (i = 0; i < audio_get_num_files(); ++i)
+		for (i = 0; i < audio_file_num_opened(); ++i)
 		{
 			printf("\t%d. %s", i+1, audio_file_name(i));
 
@@ -509,7 +509,7 @@ bool again		= true;
 int err;
 int index = fnum-1;
 
-	if (!audio_is_file_open(index))
+	if (!audio_file_is_open(index))
 	{
 		printf("A wrong file number has been specified. Aborted.\r\n");
 		return;
@@ -534,7 +534,7 @@ int index = fnum-1;
 		wait_enter();
 		printf("\r\n");
 
-		err = record_sample_to_play(index);
+		err = audio_file_record_sample_to_play(index);
 
 		if (err)
 		{
@@ -551,7 +551,7 @@ int index = fnum-1;
 
 		while (again)
 		{
-			play_recorded_sample(index);
+			audio_file_play_recorded_sample(index);
 			again = ask_yes_no("Do you want to listen it again?");
 		}
 
@@ -564,7 +564,7 @@ int index = fnum-1;
 
 			if (!again)
 			{
-				discard_recorded_sample(index);
+				audio_file_discard_recorded_sample(index);
 				printf("Discarded!\r\n");
 			}
 		}
@@ -577,7 +577,7 @@ int index = fnum-1;
 
 static inline void cmd_playback(int fnum)
 {
-	play_recorded_sample(fnum-1);
+	audio_file_play_recorded_sample(fnum-1);
 }
 
 /**
@@ -782,7 +782,7 @@ static inline int start_analyzer_tasks()
 int i;
 int num_recording_files = 0;
 
-	for (i = 0; i < audio_get_num_files(); ++i)
+	for (i = 0; i < audio_file_num_opened(); ++i)
 	{
 		if (audio_file_has_rec(i))
 		{
@@ -792,7 +792,7 @@ int num_recording_files = 0;
 				TASK_ALS_PERIOD,
 				TASK_ALS_DEADLINE,
 				GET_PRIO(TASK_ALS_PRIORITY),
-				als_task,
+				analysis_task,
 				STATIC_CAST(void *, &i),
 				sizeof(i)
 			);
@@ -875,7 +875,7 @@ static inline void join_tasks()
 	int num_recording_files = 0;
 	int i;
 
-	for (i = 0; i < audio_get_num_files(); ++i)
+	for (i = 0; i < audio_file_num_opened(); ++i)
 	{
 		if (audio_file_has_rec(i))
 		{

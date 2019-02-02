@@ -65,10 +65,6 @@
 								///< The number of seconds to wait before
 								///< recording an audio sample
 
-// HACK: move somewhere else
-#define IS_ODD(n) (n & 0x01)
-#define IS_EVEN(n) (!IS_ODD(n))
-
 // -----------------------------------------------------------------------------
 //                           PRIVATE DATA TYPES
 // -----------------------------------------------------------------------------
@@ -164,7 +160,7 @@ typedef struct __AUDIO_FFT_STRUCT
 
 } audio_fft_t;
 
-/// Structure that contains a cab used by the unnormalized_cross_correlation()
+/// Structure that contains a cab used by the correlation_non_normalized()
 /// function
 typedef struct __AUDIO_ANALYSIS_STRUCT
 {
@@ -182,7 +178,7 @@ typedef struct __AUDIO_STRUCT
 								///< Array of opened audio files descriptors for
 								///< reproduction
 
-	int opened_audio_files;		///< Number of currently opened audio files
+	int audio_files_opened;		///< Number of currently opened audio files
 
 	audio_record_t record;		///< Contains all the data needed to record
 
@@ -213,25 +209,6 @@ const audio_file_desc_t audio_file_new =
 	.filename	= "",
 };
 
-void audio_file_copy(audio_file_desc_t *dest, const audio_file_desc_t*src)
-{
-	if (src->has_rec)
-	{
-		*dest = *src;
-	}
-	else
-	{
-		// I can skip copying the big arrays
-		dest->datap		= src->datap;
-		dest->type		= src->type;
-		dest->volume	= src->volume;
-		dest->panning	= src->panning;
-		dest->frequency	= src->frequency;
-		dest->has_rec	= src->has_rec;
-		strcpy(dest->filename, src->filename);
-	}
-}
-
 // -----------------------------------------------------------------------------
 //                           GLOBAL VARIABLES
 // -----------------------------------------------------------------------------
@@ -239,7 +216,7 @@ void audio_file_copy(audio_file_desc_t *dest, const audio_file_desc_t*src)
 /// The variable keeping the whole state of the audio module
 static audio_state_t audio_state =
 {
-	.opened_audio_files = 0,
+	.audio_files_opened = 0,
 };
 
 // -----------------------------------------------------------------------------
@@ -250,6 +227,9 @@ static audio_state_t audio_state =
  * @name Private functions
  */
 //@{
+
+#define IS_ODD(n) (n & 0x01)		///< Returns non-zero if the number is odd
+#define IS_EVEN(n) (!IS_ODD(n))		///< Returns non-zero if the number is even
 
 /**
  * Copies the basename of the given path into dest, ellipsing it if too long.
@@ -281,8 +261,254 @@ int		len;
 	strncpy(dest, base_name, MAX_AUDIO_NAME_LENGTH);
 }
 
+/**
+ * Copy the in_buffer into out_buffer, setting to zero padding (if specified in
+ * the associated constant).
+ */
+static inline void copy_buffer_with_padding(double *out_buffer, const short *in_buffer)
+{
+size_t i;
+	// NOTICE: it's not a coincidence I'm using record.rframes instead
+	// than fft.rframes, because the two differ in the case zero-padding
+	// is enabled!
+	for (i = 0; i < audio_state.record.rframes; ++i)
+	{
+		out_buffer[i] = (double)in_buffer[i];
+	}
 
-int alsa_install_pcm(snd_pcm_t **alsa_handle_ptr,
+	// Reset zero padding if needed, hence if record.rframes < fft.rframes;
+	// This loop starts with i equal to audio_state.record.rframes
+	for (; i < audio_state.fft.rframes; ++i)
+	{
+		out_buffer[i] = 0.;
+	}
+}
+
+
+/**
+ * Compute in-place real FFT.
+ */
+static inline void fft(double* data)
+{
+	fftw_execute_r2r(audio_state.fft.plan, data, data);
+}
+
+/**
+ * Compute in-place complex IFFT.
+ */
+static inline void ifft(double* data)
+{
+size_t i;
+
+	fftw_execute_r2r(audio_state.fft.plan_inverse, data, data);
+
+	// Normalization, because FFTW computes unnormalized FFT/IFFT
+	for (i = 0; i < audio_state.fft.rframes; ++i)
+	{
+		data[i] /= audio_state.fft.rframes;
+	}
+}
+
+/**
+ * The index of the real part of the complex value with index i in a complex FFT
+ * sequence.
+ */
+static inline int index_real(int i)
+{
+	return i;
+}
+
+/**
+ * The index of the imaginary part of the complex value with index i in a
+ * complex FFT sequence.
+ */
+static inline int index_imaginary(int i)
+{
+	return audio_state.fft.rframes - i;
+}
+
+/**
+ * Computes the cross correlation between two ffts in input, writing the result
+ * as a signal in the time domain in output array.
+ */
+static inline void cross_correlation(double *output,
+	const double *first_fft, const double *second_fft)
+{
+int i;
+int re_idx;		// The index of the real part
+int im_idx;		// The index of the imaginary part
+int last_idx;	// The index of the last element (which is a pure real value)
+
+	// Number of complex numbers composing the fft
+	int number_complex = AUDIO_FRAMES_TO_HALFCOMPLEX(audio_state.fft.rframes);
+
+	// I need to multiply element-wise complex numbers from the first fft to the
+	// complex conjugate of the second_fft, then calculate the inverse fft of
+	// the output
+
+	// First element is always pure real
+	output[0] = first_fft[0] * second_fft[0];
+
+	// Last element is also always pure real (if present)
+	// NOTICE: this element is computed only if the rframes number is even
+	if (IS_EVEN(audio_state.fft.rframes))
+	{
+		last_idx = audio_state.fft.rframes / 2;
+		output[last_idx] = first_fft[last_idx] * second_fft[last_idx];
+	}
+
+	// Starting from second element, until AUDIO_FRAMES_TO_HALFCOMPLEX(fft.rframes)
+	// multiply together complex numbers:
+	//	out	= a * conj(b)
+	//		= ...
+	//		= re(a)*re(b) + im(a)*im(b) + j*(im(a)*re(b) - re(a)*im(b))
+
+	// Thus we can calculate separately the two values as
+	// re(out) = re(a)*re(b) + im(a)*im(b)
+	// im(out) = im(a)*re(b) - re(a)*im(b)
+
+	for(i = 1; i <= number_complex; ++i)
+	{
+		re_idx = index_real(i);
+		im_idx = index_imaginary(i);
+		output[re_idx] = first_fft[re_idx] * second_fft[re_idx]
+					   + first_fft[im_idx] * second_fft[im_idx];
+		output[im_idx] = first_fft[im_idx] * second_fft[re_idx]
+					   - first_fft[re_idx] * second_fft[im_idx];
+	}
+
+	// Finally, compute the inverse fft
+	ifft(output);
+}
+
+/**
+ * Returns the maximum value among the values in v.
+ */
+static inline double max(double *v, size_t n)
+{
+size_t i;
+double m = v[0];
+
+	for (i = 1; i < n; ++i)
+	{
+		if (m < v[i])
+			m = v[i];
+	}
+
+	return m;
+}
+
+/**
+ * Computes the non-normalized correlation value between the two given FFTs.
+ * This can be used to calculate the auto-correlatino of a fft with itself,
+ * since first_fft and second_fft can be the same vector.
+ */
+static inline double correlation_non_normalized(const double *first_fft, const double *second_fft)
+{
+double *buffer;
+ptask_cab_id_t index;
+
+	// Cannot fail
+	ptask_cab_reserve(&audio_state.analysis.cab,
+		STATIC_CAST(void **, &buffer),
+		&index);
+
+	cross_correlation(buffer, first_fft, second_fft);
+
+	double correlation_value = max(buffer, audio_state.fft.rframes);
+
+	ptask_cab_unget(&audio_state.analysis.cab, index);
+
+	return correlation_value;
+}
+
+/**
+ * Computes the normalized correlation value between the two given FFTs.
+ * Normalization is computed by means of the auto-correlation of each of the
+ * given FFTs, which can be computed using correlation_non_normalized().
+ */
+static inline double correlation_normalized(const double *first_fft, const double *second_fft,
+	double first_autocorr, double second_autocorr)
+{
+	double unnormalized = correlation_non_normalized(first_fft, second_fft);
+
+	return (unnormalized * unnormalized) / (first_autocorr * second_autocorr);
+}
+
+/**
+ * Waits for a specified amount of ms.
+ * If interrupted the wait is resumed with the remaining time, thus this
+ * function always waits for the specified amount of ms.
+ */
+static inline void timed_wait(int ms)
+{
+int s = 0;
+
+	if (ms < 1)
+		return;
+
+	if (ms >= 1000) {
+		s = ms / 1000;
+		ms = ms % 1000;
+	}
+
+	const struct timespec req = {
+		.tv_sec = s,
+		.tv_nsec = ms * 1000000L,
+	};
+
+	// The nanosleep updates req with the remaining time if interrupted, thus
+	// even if interrupted the call waits always for the given amount of ms
+	// before terminating.
+	while(clock_nanosleep(CLOCK_MONOTONIC, 0, &req, NULL))
+		;
+}
+
+/**
+ * Waits for the given amount of seconds, printing a countdown on the standard
+ * output every second, followed by an exclamation mark when the countdown is
+ * finished.
+ * TODO: move
+ */
+static inline void wait_seconds_print(int nseconds)
+{
+	for (; nseconds > 0; --nseconds)
+	{
+		printf("%d . . . ", nseconds);
+		fflush(stdout);
+		timed_wait(1000);
+	}
+	printf("!\r\n");
+}
+
+/**
+ * Copy file descriptor src into dest. Use this instead of simple assignment
+ * operator to skip copying unnecessary buffers.
+ */
+static inline void audio_file_copy(audio_file_desc_t *dest, const audio_file_desc_t*src)
+{
+	if (src->has_rec)
+	{
+		*dest = *src;
+	}
+	else
+	{
+		// I can skip copying the big arrays
+		dest->datap		= src->datap;
+		dest->type		= src->type;
+		dest->volume	= src->volume;
+		dest->panning	= src->panning;
+		dest->frequency	= src->frequency;
+		dest->has_rec	= src->has_rec;
+		strcpy(dest->filename, src->filename);
+	}
+}
+
+/**
+ * Initialize an ALSA PCM device handle, either a playback or a recording
+ * handle, depending on the value of stream_direction.
+ */
+static inline int install_alsa_pcm(snd_pcm_t **alsa_handle_ptr,
 	unsigned int *rrate_ptr, snd_pcm_uframes_t *rframes_ptr,
 	snd_pcm_stream_t stream_direction,
 	int mode
@@ -393,54 +619,14 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	return 0;
 }
 
-void copy_audio_with_padding(double *out_buffer, const short *in_buffer)
-{
-size_t i;
-	// NOTICE: it's not a coincidence I'm using record.rframes instead
-	// than fft.rframes, because the two differ in the case zero-padding
-	// is enabled!
-	for (i = 0; i < audio_state.record.rframes; ++i)
-	{
-		out_buffer[i] = (double)in_buffer[i];
-	}
-
-	// Reset zero padding if needed, hence if record.rframes < fft.rframes;
-	// This loop starts with i equal to audio_state.record.rframes
-	for (; i < audio_state.fft.rframes; ++i)
-	{
-		out_buffer[i] = 0.;
-	}
-}
-
-
-// TODO: move somewhere else
-void fft(double* data)
-{
-	fftw_execute_r2r(audio_state.fft.plan, data, data);
-}
-
-void ifft(double* data)
-{
-size_t i;
-
-	fftw_execute_r2r(audio_state.fft.plan_inverse, data, data);
-
-	// Normalization, because FFTW computes unnormalized FFT/IFFT
-	for (i = 0; i < audio_state.fft.rframes; ++i)
-	{
-		data[i] /= audio_state.fft.rframes;
-	}
-}
-
-
 /**
  * Initialize ALSA recorder handle.
  * TODO: document arguments
  */
-int alsa_install_recorder(snd_pcm_t **record_handle_ptr,
+int install_alsa_recorder(snd_pcm_t **record_handle_ptr,
 	unsigned int *rrate_ptr, snd_pcm_uframes_t *rframes_ptr)
 {
-	return alsa_install_pcm(record_handle_ptr, rrate_ptr, rframes_ptr,
+	return install_alsa_pcm(record_handle_ptr, rrate_ptr, rframes_ptr,
 		SND_PCM_STREAM_CAPTURE, SND_PCM_NONBLOCK);
 }
 
@@ -448,18 +634,18 @@ int alsa_install_recorder(snd_pcm_t **record_handle_ptr,
  * Initialize ALSA playback handle.
  * TODO: document arguments
  */
-int alsa_install_playback(snd_pcm_t **playback_handle_ptr,
+int install_alsa_playback(snd_pcm_t **playback_handle_ptr,
 	unsigned int *rrate_ptr, snd_pcm_uframes_t *rframes_ptr)
 {
 	// The zero indicates the blocking mode
-	return alsa_install_pcm(playback_handle_ptr, rrate_ptr, rframes_ptr,
+	return install_alsa_pcm(playback_handle_ptr, rrate_ptr, rframes_ptr,
 		SND_PCM_STREAM_PLAYBACK, 0);
 }
 
 /**
  * Initializes both Allegro sound and ALSA library to record
  */
-static inline int allegro_alsa_sound_init(unsigned int *rrate_ptr,
+static inline int install_allegro_alsa_sound(unsigned int *rrate_ptr,
 	snd_pcm_uframes_t *rframes_ptr, snd_pcm_t **record_handle_ptr,
 	snd_pcm_t **playback_handle_ptr)
 {
@@ -476,11 +662,11 @@ void *cab_pointers[AUDIO_NUM_BUFFERS];
 	if (err) return err;
 
 	// Initialization of ALSA recorder
-	err = alsa_install_recorder(record_handle_ptr, rrate_ptr, rframes_ptr);
+	err = install_alsa_recorder(record_handle_ptr, rrate_ptr, rframes_ptr);
 	if (err) return err;
 
 	// Initialization of ALSA playback
-	err = alsa_install_playback(playback_handle_ptr, rrate_ptr, rframes_ptr);
+	err = install_alsa_playback(playback_handle_ptr, rrate_ptr, rframes_ptr);
 	if (err) return err;
 
 	// Construction of CAB pointers for audio buffers
@@ -502,7 +688,7 @@ void *cab_pointers[AUDIO_NUM_BUFFERS];
 /**
  * Initializes FFTW3 library to perform FFT analysis
  */
-static inline int fft_init(snd_pcm_uframes_t rframes,
+static inline int install_fftw(snd_pcm_uframes_t rframes,
 	fftw_plan* fft_plan_ptr,
 	fftw_plan* fft_plan_inverse_ptr)
 {
@@ -585,7 +771,7 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
 /**
  * Initializes analysis data structure.
  */
-static inline int analysis_init()
+static inline int install_analysis()
 {
 int err;
 int index;
@@ -619,22 +805,6 @@ static inline int mic_prepare()
 	return snd_pcm_prepare(audio_state.record.record_handle);
 }
 
-static inline int playback_prepare()
-{
-	return snd_pcm_prepare(audio_state.record.playback_handle);
-}
-
-/**
- * Stops the microphone, dropping immediately any buffered frame.
- * It is used when it's sure that no further frame will be needed from now
- * until the next prepare.
- * TODO: check what are the return values.
- */
-static inline int mic_stop()
-{
-	return snd_pcm_drop(audio_state.record.record_handle);
-}
-
 /**
  * Reads microphone data if available, microphone is non-blocking so this call
  * returns immediately with the number of read frames. Returns 0 if there were
@@ -657,536 +827,6 @@ int err;
 
 	return err;
 }
-
-/**
- * Waits for a specified amount of ms.
- * If interrupted the wait is resumed with the remaining time, thus this
- * function always waits for the specified amount of ms.
- */
-static inline void timed_wait(int ms)
-{
-int s = 0;
-
-	if (ms < 1)
-		return;
-
-	if (ms >= 1000) {
-		s = ms / 1000;
-		ms = ms % 1000;
-	}
-
-	const struct timespec req = {
-		.tv_sec = s,
-		.tv_nsec = ms * 1000000L,
-	};
-
-	// The nanosleep updates req with the remaining time if interrupted, thus
-	// even if interrupted the call waits always for the given amount of ms
-	// before terminating.
-	while(clock_nanosleep(CLOCK_MONOTONIC, 0, &req, NULL))
-		;
-}
-
-//@}
-
-// -----------------------------------------------------------------------------
-//                           PUBLIC FUNCTIONS
-// -----------------------------------------------------------------------------
-
-// See the header file for documentation
-
-/* ------- UNSAFE FUNCTIONS - CALL ONLY IN SINGLE THREAD ENVIRONMENT -------- */
-
-int audio_init()
-{
-int err;
-
-unsigned int 		rrate	= AUDIO_DESIRED_RATE;
-								// Recording acquisition ratio, as accepted by
-								// the device
-
-snd_pcm_uframes_t	rframes	= AUDIO_DESIRED_FRAMES;
-								// Period requested to recorder task, expressed
-								// in terms of number of frames
-
-snd_pcm_t *record_handle;		// ALSA Hardware Handle used to record audio
-snd_pcm_t *playback_handle;		// ALSA Hardware Handle used to playback recorded audio
-
-fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
-								// be used to calculate the FFT, optimized for
-								// the size of the recording buffer
-
-fftw_plan fft_plan_inverse;		// The FFTW3 plan used to compute the inverse FFT
-
-	// Mutex initialization
-	err = ptask_mutex_init(&audio_state.mutex);
-	if (err) return err;
-
-	// Allegro and ALSA initialization
-	err = allegro_alsa_sound_init(&rrate, &rframes, &record_handle, &playback_handle);
-	if (err) return err;
-
-	// FFTW3 initialization
-	err = fft_init(rframes, &fft_plan, &fft_plan_inverse);
-	if (err) return err;
-
-	// Analysis data structures initialization
-	err = analysis_init();
-	if (err) return err;
-
-	// Copy local vales to global structures
-	audio_state.record.rrate			= rrate;
-	audio_state.record.rframes			= rframes;
-	audio_state.record.record_handle	= record_handle;
-	audio_state.record.playback_handle	= playback_handle;
-
-	audio_state.fft.rrate			= rrate;
-	audio_state.fft.rframes			= AUDIO_ADD_PADDING(rframes);
-	audio_state.fft.plan			= fft_plan;
-	audio_state.fft.plan_inverse	= fft_plan_inverse;
-
-	return 0;
-}
-
-int audio_open_file(const char *filename)
-{
-audio_pointer_t	file_pointer;	// Pointer to the opened file
-audio_type_t	file_type;		// Detected file type
-int				index;			// Index of newly used audio file descriptor
-
-	if (audio_state.opened_audio_files >= AUDIO_MAX_FILES)
-		return EAGAIN;
-
-	index = audio_state.opened_audio_files;
-
-	file_pointer.audio_p = load_sample(filename);
-	file_type = AUDIO_TYPE_SAMPLE;
-
-	if (!file_pointer.gen_p)
-	{
-		// It was not an audio file, let's try if it was a MIDI istead
-		file_pointer.midi_p = load_midi(filename);
-		file_type = AUDIO_TYPE_MIDI;
-	}
-
-	if (file_pointer.gen_p)
-	{
-		// Valid input file
-		audio_file_copy(&audio_state.audio_files[index], &audio_file_new);
-		audio_state.audio_files[index].type = file_type;
-		path_to_basename(audio_state.audio_files[index].filename, filename);
-		audio_state.audio_files[index].datap = file_pointer;
-
-		++audio_state.opened_audio_files;
-	}
-
-	// If the pointer is NULL then the file was an invalid input
-	return file_pointer.gen_p ? 0 : EINVAL;
-}
-
-bool audio_is_file_open(int i)
-{
-	return i >= 0 && i < audio_state.opened_audio_files;
-}
-
-int audio_file_opened()
-{
-	return audio_state.opened_audio_files;
-}
-
-int audio_close_file(int filenum)
-{
-int err = 0;
-
-	if (audio_is_file_open(filenum))
-	{
-		switch (audio_state.audio_files[filenum].type)
-		{
-		case AUDIO_TYPE_SAMPLE:
-			destroy_sample(audio_state.audio_files[filenum].datap.audio_p);
-			break;
-		case AUDIO_TYPE_MIDI:
-			destroy_midi(audio_state.audio_files[filenum].datap.midi_p);
-			break;
-		default:
-			assert(false);
-		}
-
-		--audio_state.opened_audio_files;
-
-		// Shift back array, starting from position of filenum
-		for(; filenum < audio_state.opened_audio_files; ++filenum)
-		{
-			audio_file_copy(
-				&audio_state.audio_files[filenum],
-				&audio_state.audio_files[filenum+1]
-			);
-		}
-
-		// audio_state.audio_files[audio_state.opened_audio_files] = audio_file_new;
-	}
-	else
-		err = EINVAL;
-
-	return err;
-}
-
-bool audio_file_has_rec(int i)
-{
-	return audio_state.audio_files[i].has_rec;
-}
-
-char* audio_file_name(int i)
-{
-	return audio_state.audio_files[i].filename;
-}
-
-/* ------------- SAFE FUNCTIONS - CAN BE CALLED FROM ANY THREAD ------------- */
-
-int audio_play_file(int filenum)
-{
-int					err = 0;
-audio_file_desc_t	file;
-
-	// Nobody can modify in multithreaded environment the number of opened audio
-	// files
-	if (filenum >= 0 && filenum < audio_state.opened_audio_files)
-	{
-		ptask_mutex_lock(&audio_state.mutex);
-
-		file = audio_state.audio_files[filenum];
-
-		ptask_mutex_unlock(&audio_state.mutex);
-
-		switch (file.type)
-		{
-		case AUDIO_TYPE_SAMPLE:
-			err = play_sample(
-				file.datap.audio_p,
-				file.volume,
-				file.panning,
-				file.frequency,
-				false /*file.loop*/
-				);
-
-			err = err < 0 ? EINVAL : 0;
-
-			break;
-		case AUDIO_TYPE_MIDI:
-			err = play_midi(
-				file.datap.midi_p,
-				false /*file.loop*/
-				);
-
-			break;
-		default:
-			assert(false);
-			err = EINVAL;
-		}
-	}
-	else
-		err = EINVAL;
-
-	return err;
-}
-
-void audio_stop()
-{
-int i;
-	ptask_mutex_lock(&audio_state.mutex);
-
-	for (i = 0; i < audio_state.opened_audio_files; ++i)
-	{
-		if (audio_state.audio_files[i].type == AUDIO_TYPE_SAMPLE)
-			stop_sample(audio_state.audio_files[i].datap.audio_p);
-	}
-
-	ptask_mutex_unlock(&audio_state.mutex);
-
-	stop_midi();
-}
-
-// -------------- GETTERS --------------
-
-int audio_get_record_rrate() {
-	return audio_state.record.rrate;
-}
-
-int audio_get_record_rframes() {
-	return audio_state.record.rframes;
-}
-
-int audio_get_fft_rrate() {
-	return audio_state.fft.rrate;
-}
-
-int audio_get_fft_rframes() {
-	return audio_state.fft.rframes;
-}
-
-int audio_get_num_files()
-{
-	// Safe since the number of opened files cannot be modified in multithreaded
-	// environment
-	return audio_state.opened_audio_files;
-}
-
-const char* audio_get_filename(int i)
-{
-	if (!audio_is_file_open(i))
-		return NULL;
-
-	// Safe since the files cannot be opened/closed in multithreaded
-	// environment
-	return audio_state.audio_files[i].filename;
-}
-
-int audio_get_volume(int i)
-{
-int ret;
-
-	if (i >= audio_state.opened_audio_files)
-		return -1;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	ret = audio_state.audio_files[i].volume;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-
-	return ret;
-}
-
-int audio_get_panning(int i)
-{
-int ret;
-
-	if (i >= audio_state.opened_audio_files)
-		return -1;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	ret = audio_state.audio_files[i].panning;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-
-	return ret;
-}
-
-int audio_get_frequency(int i)
-{
-int ret;
-
-	if (i >= audio_state.opened_audio_files)
-		return -1;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	ret = audio_state.audio_files[i].frequency / 10;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-
-	return ret;
-}
-
-audio_type_t audio_get_type(int i)
-{
-	// Safe since the audio type cannot  be modified in multithreaded
-	// environment
-
-	if (i >= audio_state.opened_audio_files)
-		return AUDIO_TYPE_INVALID;
-	else
-		return audio_state.audio_files[i].type;
-}
-
-// -------------- SETTERS --------------
-
-void audio_set_volume(int i, int val)
-{
-	val = val < MIN_VOL ? MIN_VOL : val > MAX_VOL ? MAX_VOL : val;
-
-	if (i >= audio_state.opened_audio_files)
-		return;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	audio_state.audio_files[i].volume = val;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-}
-
-void audio_set_panning(int i, int val)
-{
-
-	val = val < CLX_PAN ? CLX_PAN : val > CRX_PAN ? CRX_PAN : val;
-
-	if (i >= audio_state.opened_audio_files)
-		return;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	audio_state.audio_files[i].panning = val;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-}
-
-void audio_set_frequency(int i, int val)
-{
-	val *= 10;
-
-	val = val < MIN_FREQ ? MIN_FREQ : val > MAX_FREQ ? MAX_FREQ : val;
-
-	if (i >= audio_state.opened_audio_files)
-		return;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	audio_state.audio_files[i].frequency = val;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-
-}
-
-// -------------- MODIFIERS --------------
-
-void audio_volume_up(int i)
-{
-	if (i >= audio_state.opened_audio_files)
-		return;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	++audio_state.audio_files[i].volume;
-
-	if (audio_state.audio_files[i].volume > MAX_VOL)
-		audio_state.audio_files[i].volume = MAX_VOL;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-}
-
-void audio_volume_down(int i)
-{
-	if (i >= audio_state.opened_audio_files)
-		return;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	--audio_state.audio_files[i].volume;
-
-	if (audio_state.audio_files[i].volume < MIN_VOL)
-		audio_state.audio_files[i].volume = MIN_VOL;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-}
-
-void audio_panning_up(int i)
-{
-	if (i >= audio_state.opened_audio_files)
-		return;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	++audio_state.audio_files[i].panning;
-
-	if (audio_state.audio_files[i].panning > CRX_PAN)
-		audio_state.audio_files[i].panning = CRX_PAN;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-}
-
-void audio_panning_down(int i)
-{
-	if (i >= audio_state.opened_audio_files)
-		return;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	--audio_state.audio_files[i].panning;
-
-	if (audio_state.audio_files[i].panning < CLX_PAN)
-		audio_state.audio_files[i].panning = CLX_PAN;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-}
-
-void audio_frequency_up(int i)
-{
-	if (i >= audio_state.opened_audio_files)
-		return;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	audio_state.audio_files[i].frequency += 10;
-
-	if (audio_state.audio_files[i].frequency > MAX_FREQ)
-		audio_state.audio_files[i].frequency = MAX_FREQ;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-}
-
-void audio_frequency_down(int i)
-{
-	if (i >= audio_state.opened_audio_files)
-		return;
-
-	ptask_mutex_lock(&audio_state.mutex);
-
-	audio_state.audio_files[i].frequency -= 10;
-
-	if (audio_state.audio_files[i].frequency < MIN_FREQ)
-		audio_state.audio_files[i].frequency = MIN_FREQ;
-
-	ptask_mutex_unlock(&audio_state.mutex);
-}
-
-// -------------- BUFFERS FUNCTIONS --------------
-
-int audio_get_last_record(const short* buffer_ptr[], int* buffer_index_ptr)
-{
-int err;
-
-	err = ptask_cab_getmes(&audio_state.record.cab,
-		STATIC_CAST(const void**, buffer_ptr),
-		buffer_index_ptr,
-		NULL);
-
-	if (err)
-		return -EAGAIN;
-
-	return audio_state.record.rframes;
-}
-
-void audio_free_last_record(int buffer_index)
-{
-	ptask_cab_unget(&audio_state.record.cab, buffer_index);
-}
-
-int audio_get_last_fft(const double *buffer_ptr[], int *buffer_index_ptr)
-{
-int err;
-fft_output_t *fft_pointer;	// Pointer to the fft structure obtained from the cab
-
-	err = ptask_cab_getmes(&audio_state.fft.cab,
-		STATIC_CAST(const void **, &fft_pointer),
-		buffer_index_ptr,
-		NULL);
-
-	if (err)
-		return -EAGAIN;
-
-	// Since the fft is stored with autocorrelation, we extract it
-	*buffer_ptr = fft_pointer->fft;
-
-	return audio_state.fft.rframes;
-}
-
-void audio_free_last_fft(int buffer_index)
-{
-	ptask_cab_unget(&audio_state.fft.cab, buffer_index);
-}
-
-// -------------- MICROPHONE --------------
 
 /**
  * Reads microphone data if available, blocking until the number of frames that
@@ -1289,121 +929,522 @@ int missing = nframes;	// How many frames are still missing
 }
 
 /**
- * Waits for the given amount of seconds, printing a countdown on the standard
- * output every second, followed by an exclamation mark when the countdown is
- * finished.
- * TODO: move
+ * Stops the microphone, dropping immediately any buffered frame.
+ * It is used when it's sure that no further frame will be needed from now
+ * until the next prepare.
+ * TODO: check what are the return values.
  */
-static inline void wait_seconds_print(int nseconds)
+static inline int mic_stop()
 {
-	for (; nseconds > 0; --nseconds)
+	return snd_pcm_drop(audio_state.record.record_handle);
+}
+
+/**
+ * Prepares the alsa playback handle to play a recorded sample.
+ * Returns 0 on success, less than zero on error.
+ * TODO: check what are the return values.
+ */
+static inline int playback_prepare()
+{
+	return snd_pcm_prepare(audio_state.record.playback_handle);
+}
+
+/**
+ * Mark that no more data will be streamed and close the hardware handle
+ * after the last frame has been sent to the interface.
+ */
+static inline int playback_stop()
+{
+	return snd_pcm_drain(audio_state.record.playback_handle);
+}
+
+
+//@}
+
+// -----------------------------------------------------------------------------
+//                           PUBLIC FUNCTIONS
+// -----------------------------------------------------------------------------
+
+// See the header file for documentation
+
+/* ------- UNSAFE FUNCTIONS - CALL ONLY IN SINGLE THREAD ENVIRONMENT -------- */
+
+int audio_init()
+{
+int err;
+
+unsigned int 		rrate	= AUDIO_DESIRED_RATE;
+								// Recording acquisition ratio, as accepted by
+								// the device
+
+snd_pcm_uframes_t	rframes	= AUDIO_DESIRED_FRAMES;
+								// Period requested to recorder task, expressed
+								// in terms of number of frames
+
+snd_pcm_t *record_handle;		// ALSA Hardware Handle used to record audio
+snd_pcm_t *playback_handle;		// ALSA Hardware Handle used to playback recorded audio
+
+fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
+								// be used to calculate the FFT, optimized for
+								// the size of the recording buffer
+
+fftw_plan fft_plan_inverse;		// The FFTW3 plan used to compute the inverse FFT
+
+	// Mutex initialization
+	err = ptask_mutex_init(&audio_state.mutex);
+	if (err) return err;
+
+	// Allegro and ALSA initialization
+	err = install_allegro_alsa_sound(&rrate, &rframes, &record_handle, &playback_handle);
+	if (err) return err;
+
+	// FFTW3 initialization
+	err = install_fftw(rframes, &fft_plan, &fft_plan_inverse);
+	if (err) return err;
+
+	// Analysis data structures initialization
+	err = install_analysis();
+	if (err) return err;
+
+	// Copy local vales to global structures
+	audio_state.record.rrate			= rrate;
+	audio_state.record.rframes			= rframes;
+	audio_state.record.record_handle	= record_handle;
+	audio_state.record.playback_handle	= playback_handle;
+
+	audio_state.fft.rrate			= rrate;
+	audio_state.fft.rframes			= AUDIO_ADD_PADDING(rframes);
+	audio_state.fft.plan			= fft_plan;
+	audio_state.fft.plan_inverse	= fft_plan_inverse;
+
+	return 0;
+}
+
+int audio_file_open(const char *filename)
+{
+audio_pointer_t	file_pointer;	// Pointer to the opened file
+audio_type_t	file_type;		// Detected file type
+int				index;			// Index of newly used audio file descriptor
+
+	if (audio_state.audio_files_opened >= AUDIO_MAX_FILES)
+		return EAGAIN;
+
+	index = audio_state.audio_files_opened;
+
+	file_pointer.audio_p = load_sample(filename);
+	file_type = AUDIO_TYPE_SAMPLE;
+
+	if (!file_pointer.gen_p)
 	{
-		printf("%d . . . ", nseconds);
-		fflush(stdout);
-		timed_wait(1000);
+		// It was not an audio file, let's try if it was a MIDI istead
+		file_pointer.midi_p = load_midi(filename);
+		file_type = AUDIO_TYPE_MIDI;
 	}
-	printf("!\r\n");
+
+	if (file_pointer.gen_p)
+	{
+		// Valid input file
+		audio_file_copy(&audio_state.audio_files[index], &audio_file_new);
+		audio_state.audio_files[index].type = file_type;
+		path_to_basename(audio_state.audio_files[index].filename, filename);
+		audio_state.audio_files[index].datap = file_pointer;
+
+		++audio_state.audio_files_opened;
+	}
+
+	// If the pointer is NULL then the file was an invalid input
+	return file_pointer.gen_p ? 0 : EINVAL;
 }
 
-int real_index(int i)
+bool audio_file_is_open(int i)
 {
-	return i;
+	return i >= 0 && i < audio_state.audio_files_opened;
 }
 
-int imaginary_index(int i)
+int audio_file_num_opened()
 {
-	return audio_state.fft.rframes - i;
+	return audio_state.audio_files_opened;
 }
 
-void cross_correlation(double *output, const double *first_fft, const double *second_fft)
+int audio_file_close(int i)
+{
+int err = 0;
+
+	if (audio_file_is_open(i))
+	{
+		switch (audio_state.audio_files[i].type)
+		{
+		case AUDIO_TYPE_SAMPLE:
+			destroy_sample(audio_state.audio_files[i].datap.audio_p);
+			break;
+		case AUDIO_TYPE_MIDI:
+			destroy_midi(audio_state.audio_files[i].datap.midi_p);
+			break;
+		default:
+			assert(false);
+		}
+
+		--audio_state.audio_files_opened;
+
+		// Shift back array, starting from position of i
+		for(; i < audio_state.audio_files_opened; ++i)
+		{
+			audio_file_copy(
+				&audio_state.audio_files[i],
+				&audio_state.audio_files[i+1]
+			);
+		}
+	}
+	else
+		err = EINVAL;
+
+	return err;
+}
+
+bool audio_file_has_rec(int i)
+{
+	return audio_state.audio_files[i].has_rec;
+}
+
+const char* audio_file_name(int i)
+{
+	return audio_state.audio_files[i].filename;
+}
+
+/* ------------- SAFE FUNCTIONS - CAN BE CALLED FROM ANY THREAD ------------- */
+
+int audio_file_play(int i)
+{
+int					err = 0;
+audio_file_desc_t	file;
+
+	// Nobody can modify in multithreaded environment the number of opened audio
+	// files
+	if (i >= 0 && i < audio_state.audio_files_opened)
+	{
+		ptask_mutex_lock(&audio_state.mutex);
+
+		file = audio_state.audio_files[i];
+
+		ptask_mutex_unlock(&audio_state.mutex);
+
+		switch (file.type)
+		{
+		case AUDIO_TYPE_SAMPLE:
+			err = play_sample(
+				file.datap.audio_p,
+				file.volume,
+				file.panning,
+				file.frequency,
+				false /*file.loop*/
+				);
+
+			err = err < 0 ? EINVAL : 0;
+
+			break;
+		case AUDIO_TYPE_MIDI:
+			err = play_midi(
+				file.datap.midi_p,
+				false /*file.loop*/
+				);
+
+			break;
+		default:
+			assert(false);
+			err = EINVAL;
+		}
+	}
+	else
+		err = EINVAL;
+
+	return err;
+}
+
+
+void audio_stop()
 {
 int i;
-int re_idx;
-int im_idx;
-int last_idx;
+	ptask_mutex_lock(&audio_state.mutex);
 
-	// Number of complex numbers composing the fft
-	int number_complex = AUDIO_FRAMES_TO_HALFCOMPLEX(audio_state.fft.rframes);
-
-	// I need to multiply element-wise complex numbers from the first fft to the
-	// complex conjugate of the second_fft, then calculate the inverse fft of
-	// the output
-
-	// First element is always pure real
-	output[0] = first_fft[0] * second_fft[0];
-
-	// Last element is also always pure real (if present)
-	// NOTICE: this element is computed only if the rframes number is even
-	if (IS_EVEN(audio_state.fft.rframes))
+	for (i = 0; i < audio_state.audio_files_opened; ++i)
 	{
-		last_idx = audio_state.fft.rframes / 2;
-		output[last_idx] = first_fft[last_idx] * second_fft[last_idx];
+		if (audio_state.audio_files[i].type == AUDIO_TYPE_SAMPLE)
+			stop_sample(audio_state.audio_files[i].datap.audio_p);
 	}
 
-	// Starting from second element, until AUDIO_FRAMES_TO_HALFCOMPLEX(fft.rframes)
-	// multiply together complex numbers:
-	//	out	= a * conj(b)
-	//		= ...
-	//		= re(a)*re(b) + im(a)*im(b) + j*(im(a)*re(b) - re(a)*im(b))
+	ptask_mutex_unlock(&audio_state.mutex);
 
-	// Thus we can calculate separately the two values as
-	// re(out) = re(a)*re(b) + im(a)*im(b)
-	// im(out) = im(a)*re(b) - re(a)*im(b)
-
-	for(i = 1; i <= number_complex; ++i)
-	{
-		re_idx = real_index(i);
-		im_idx = imaginary_index(i);
-		output[re_idx] = first_fft[re_idx] * second_fft[re_idx]
-					   + first_fft[im_idx] * second_fft[im_idx];
-		output[im_idx] = first_fft[im_idx] * second_fft[re_idx]
-					   - first_fft[re_idx] * second_fft[im_idx];
-	}
-
-	// Finally, compute the inverse fft
-	ifft(output);
+	stop_midi();
 }
 
-double max(double *v, size_t n)
-{
-size_t i;
-double m = v[0];
+// -------------- GETTERS --------------
 
-	for (i = 1; i < n; ++i)
-	{
-		if (m < v[i])
-			m = v[i];
-	}
-
-	return m;
+int audio_get_record_rrate() {
+	return audio_state.record.rrate;
 }
 
-double unnormalized_cross_correlation(const double *first_fft, const double *second_fft)
-{
-double *buffer;
-ptask_cab_id_t index;
-
-	// Cannot fail
-	ptask_cab_reserve(&audio_state.analysis.cab,
-		STATIC_CAST(void **, &buffer),
-		&index);
-
-	cross_correlation(buffer, first_fft, second_fft);
-
-	double correlation_value = max(buffer, audio_state.fft.rframes);
-
-	ptask_cab_unget(&audio_state.analysis.cab, index);
-
-	return correlation_value;
+int audio_get_record_rframes() {
+	return audio_state.record.rframes;
 }
 
-double normalized_cross_correlation(
-	const double *first_fft, const double *second_fft,
-	double first_autocorr, double second_autocorr)
-{
-	double unnormalized = unnormalized_cross_correlation(first_fft, second_fft);
+int audio_get_fft_rrate() {
+	return audio_state.fft.rrate;
+}
 
-	return (unnormalized * unnormalized) / (first_autocorr * second_autocorr);
+int audio_get_fft_rframes() {
+	return audio_state.fft.rframes;
+}
+
+int audio_get_num_files()
+{
+	// Safe since the number of opened files cannot be modified in multithreaded
+	// environment
+	return audio_state.audio_files_opened;
+}
+
+int audio_file_get_volume(int i)
+{
+int ret;
+
+	if (i >= audio_state.audio_files_opened)
+		return -1;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	ret = audio_state.audio_files[i].volume;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+
+	return ret;
+}
+
+int audio_file_get_panning(int i)
+{
+int ret;
+
+	if (i >= audio_state.audio_files_opened)
+		return -1;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	ret = audio_state.audio_files[i].panning;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+
+	return ret;
+}
+
+int audio_file_get_frequency(int i)
+{
+int ret;
+
+	if (i >= audio_state.audio_files_opened)
+		return -1;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	ret = audio_state.audio_files[i].frequency / 10;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+
+	return ret;
+}
+
+audio_type_t audio_file_type(int i)
+{
+	// Safe since the audio type cannot  be modified in multithreaded
+	// environment
+
+	if (i >= audio_state.audio_files_opened)
+		return AUDIO_TYPE_INVALID;
+	else
+		return audio_state.audio_files[i].type;
+}
+
+// -------------- SETTERS --------------
+
+void audio_set_volume(int i, int val)
+{
+	val = val < MIN_VOL ? MIN_VOL : val > MAX_VOL ? MAX_VOL : val;
+
+	if (i >= audio_state.audio_files_opened)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	audio_state.audio_files[i].volume = val;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_set_panning(int i, int val)
+{
+
+	val = val < CLX_PAN ? CLX_PAN : val > CRX_PAN ? CRX_PAN : val;
+
+	if (i >= audio_state.audio_files_opened)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	audio_state.audio_files[i].panning = val;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_set_frequency(int i, int val)
+{
+	val *= 10;
+
+	val = val < MIN_FREQ ? MIN_FREQ : val > MAX_FREQ ? MAX_FREQ : val;
+
+	if (i >= audio_state.audio_files_opened)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	audio_state.audio_files[i].frequency = val;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+
+}
+
+// -------------- MODIFIERS --------------
+
+void audio_file_volume_up(int i)
+{
+	if (i >= audio_state.audio_files_opened)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	++audio_state.audio_files[i].volume;
+
+	if (audio_state.audio_files[i].volume > MAX_VOL)
+		audio_state.audio_files[i].volume = MAX_VOL;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_file_volume_down(int i)
+{
+	if (i >= audio_state.audio_files_opened)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	--audio_state.audio_files[i].volume;
+
+	if (audio_state.audio_files[i].volume < MIN_VOL)
+		audio_state.audio_files[i].volume = MIN_VOL;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_file_panning_up(int i)
+{
+	if (i >= audio_state.audio_files_opened)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	++audio_state.audio_files[i].panning;
+
+	if (audio_state.audio_files[i].panning > CRX_PAN)
+		audio_state.audio_files[i].panning = CRX_PAN;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_file_panning_down(int i)
+{
+	if (i >= audio_state.audio_files_opened)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	--audio_state.audio_files[i].panning;
+
+	if (audio_state.audio_files[i].panning < CLX_PAN)
+		audio_state.audio_files[i].panning = CLX_PAN;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_file_frequency_up(int i)
+{
+	if (i >= audio_state.audio_files_opened)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	audio_state.audio_files[i].frequency += 10;
+
+	if (audio_state.audio_files[i].frequency > MAX_FREQ)
+		audio_state.audio_files[i].frequency = MAX_FREQ;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+void audio_file_frequency_down(int i)
+{
+	if (i >= audio_state.audio_files_opened)
+		return;
+
+	ptask_mutex_lock(&audio_state.mutex);
+
+	audio_state.audio_files[i].frequency -= 10;
+
+	if (audio_state.audio_files[i].frequency < MIN_FREQ)
+		audio_state.audio_files[i].frequency = MIN_FREQ;
+
+	ptask_mutex_unlock(&audio_state.mutex);
+}
+
+// -------------- BUFFERS FUNCTIONS --------------
+
+int audio_get_last_record(const short* buffer_ptr[], int* buffer_index_ptr)
+{
+int err;
+
+	err = ptask_cab_getmes(&audio_state.record.cab,
+		STATIC_CAST(const void**, buffer_ptr),
+		buffer_index_ptr,
+		NULL);
+
+	if (err)
+		return -EAGAIN;
+
+	return audio_state.record.rframes;
+}
+
+void audio_free_last_record(int buffer_index)
+{
+	ptask_cab_unget(&audio_state.record.cab, buffer_index);
+}
+
+int audio_get_last_fft(const double *buffer_ptr[], int *buffer_index_ptr)
+{
+int err;
+fft_output_t *fft_pointer;	// Pointer to the fft structure obtained from the cab
+
+	err = ptask_cab_getmes(&audio_state.fft.cab,
+		STATIC_CAST(const void **, &fft_pointer),
+		buffer_index_ptr,
+		NULL);
+
+	if (err)
+		return -EAGAIN;
+
+	// Since the fft is stored with autocorrelation, we extract it
+	*buffer_ptr = fft_pointer->fft;
+
+	return audio_state.fft.rframes;
+}
+
+void audio_free_last_fft(int buffer_index)
+{
+	ptask_cab_unget(&audio_state.fft.cab, buffer_index);
 }
 
 int record_sample(short* buffer)
@@ -1439,11 +1480,11 @@ int err;
 	return 0;
 }
 
-int record_sample_to_play(int i)
+int audio_file_record_sample_to_play(int i)
 {
 int err;
 
-	if (!audio_is_file_open(i))
+	if (!audio_file_is_open(i))
 	{
 		if (verbose())
 			printf("The specified audio file index is invalid!\r\n");
@@ -1465,14 +1506,14 @@ int err;
 	audio_state.audio_files[i].has_rec = true;
 
 	// Calculate the FFT of the signal once for later use
-	copy_audio_with_padding(audio_state.audio_files[i].recorded_fft,
+	copy_buffer_with_padding(audio_state.audio_files[i].recorded_fft,
 							audio_state.audio_files[i].recorded_sample);
 
 	fft(audio_state.audio_files[i].recorded_fft);
 
 	// Calculate autocorrelation once for later use, defined as the
 	// cross-correlation with itself
-	audio_state.audio_files[i].autocorr = unnormalized_cross_correlation(
+	audio_state.audio_files[i].autocorr = correlation_non_normalized(
 		audio_state.audio_files[i].recorded_fft,
 		audio_state.audio_files[i].recorded_fft
 	);
@@ -1506,19 +1547,13 @@ int err;
 	return 0;
 }
 
-/**
- * Mark that no more data will be streamed and close the hardware handle
- */
-static inline int playback_stop()
-{
-	return snd_pcm_drain(audio_state.record.playback_handle);
-}
 
-void play_recorded_sample(int i)
+// TODO: move
+void audio_file_play_recorded_sample(int i)
 {
 int err;
 
-	if (!audio_is_file_open(i) || !audio_state.audio_files[i].has_rec)
+	if (!audio_file_is_open(i) || !audio_state.audio_files[i].has_rec)
 	{
 		printf("The specified file does not exist or has no associated recording!\r\n");
 		return;
@@ -1538,7 +1573,7 @@ int err;
 		abort_on_error("ALSA PLAYBACK FAILURE!");
 }
 
-void discard_recorded_sample(int i)
+void audio_file_discard_recorded_sample(int i)
 {
 	audio_state.audio_files[i].has_rec = false;
 }
@@ -1658,9 +1693,6 @@ const short *in_buffer;	// Pointer to local input buffer
 int out_buffer_index;	// Index of local buffer used to produce fft data
 double *out_buffer;		// Pointer to local output buffer
 
-static double cross_corr_buffer[AUDIO_DESIRED_PADBUFFER_SIZE];
-						// Buffer used to calculate cross-correlation
-
 fft_output_t *out_pointer;
 
 	tp = STATIC_CAST(ptask_t *, arg);
@@ -1697,7 +1729,7 @@ fft_output_t *out_pointer;
 			out_buffer = out_pointer->fft;
 
 			// Copy data into new buffer
-			copy_audio_with_padding(out_buffer, in_buffer);
+			copy_buffer_with_padding(out_buffer, in_buffer);
 
 			// NOTICE: To be quickier I should release the in_buffer as soon as
 			// I get here, but this could lead to some confusion because there
@@ -1709,7 +1741,7 @@ fft_output_t *out_pointer;
 			fft(out_buffer);
 
 			// TODO: Should calculate its autocorrelation and publish that too somewhere, along with the fft
-			out_pointer->autocorr = unnormalized_cross_correlation(
+			out_pointer->autocorr = correlation_non_normalized(
 				out_buffer,
 				out_buffer
 			);
@@ -1743,7 +1775,7 @@ fft_output_t *out_pointer;
 }
 
 /// The body of the analyzer task
-void *als_task(void *arg)
+void *analysis_task(void *arg)
 {
 ptask_t *tp; // task pointer
 // int task_id; // task identifier
@@ -1804,8 +1836,7 @@ double correlation;
 
 			last_timestamp = new_timestamp;
 
-			correlation = normalized_cross_correlation(
-				audio_state.audio_files[file_index].recorded_fft,
+			correlation = correlation_normalized(			audio_state.audio_files[file_index].recorded_fft,
 				fft_ptr->fft,
 				audio_state.audio_files[file_index].autocorr,
 				fft_ptr->autocorr
@@ -1816,7 +1847,7 @@ double correlation;
 			// TODO: magic number
 			if (fabs(correlation) > 0.35) {
 				// TODO: insert time decay
-				audio_play_file(file_index);
+				audio_file_play(file_index);
 			}
 		}
 
