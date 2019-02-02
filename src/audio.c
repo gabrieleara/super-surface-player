@@ -127,7 +127,7 @@ typedef struct __AUDIO_RECORD_STRUCT
 	snd_pcm_t *playback_handle;	///< ALSA Hardware Handle used to playback
 								///< recorded audio
 
-	short buffers[AUDIO_NUM_BUFFERS][AUDIO_DESIRED_BUFFER_SIZE];
+	short buffers[AUDIO_REC_NUM_BUFFERS][AUDIO_DESIRED_BUFFER_SIZE];
 								///< Buffers used within the cab
 
 	ptask_cab_t cab;			///< CAB used to handle allocated buffers
@@ -157,7 +157,7 @@ typedef struct __AUDIO_FFT_STRUCT
 	fftw_plan plan;				///< The plan used to perform the FFT
 	fftw_plan plan_inverse;		///< The plan used to perform the inverse FFT
 
-	fft_output_t buffers[AUDIO_NUM_BUFFERS];
+	fft_output_t buffers[AUDIO_FFT_NUM_BUFFERS];
 								///< Buffers used within the cab
 
 	ptask_cab_t cab;			///< CAB used to handle allocated buffers
@@ -168,7 +168,7 @@ typedef struct __AUDIO_FFT_STRUCT
 /// function
 typedef struct __AUDIO_ANALYSIS_STRUCT
 {
-	double buffers[AUDIO_MAX_FILES][AUDIO_DESIRED_PADBUFFER_SIZE];
+	double buffers[AUDIO_FFT_NUM_BUFFERS][AUDIO_DESIRED_PADBUFFER_SIZE];
 								///< Buffers used within the cab
 	ptask_cab_t cab;			///< The CAB is used as a buffer pool
 } audio_analysis_t;
@@ -665,7 +665,7 @@ static inline int install_allegro_alsa_sound(unsigned int *rrate_ptr,
 int err;
 int index;
 
-void *cab_pointers[AUDIO_NUM_BUFFERS];
+void *cab_pointers[AUDIO_REC_NUM_BUFFERS];
 								// Pointers to buffers used in cab library
 
 	// Allegro sound initialization
@@ -683,7 +683,7 @@ void *cab_pointers[AUDIO_NUM_BUFFERS];
 	if (err) return err;
 
 	// Construction of CAB pointers for audio buffers
-	for (index = 0; index < AUDIO_NUM_BUFFERS; ++index)
+	for (index = 0; index < AUDIO_REC_NUM_BUFFERS; ++index)
 	{
 		cab_pointers[index] = STATIC_CAST(void*, audio_state.record.buffers[index]);
 	}
@@ -691,7 +691,7 @@ void *cab_pointers[AUDIO_NUM_BUFFERS];
 	// Initializing capture CAB buffers, the pointers are copied to the cab
 	// structure
 	err = ptask_cab_init(&audio_state.record.cab,
-		AUDIO_NUM_BUFFERS,
+		AUDIO_REC_NUM_BUFFERS,
 		AUDIO_DESIRED_BUFFER_SIZE,
 		cab_pointers);
 
@@ -708,7 +708,7 @@ static inline int install_fftw(snd_pcm_uframes_t rframes,
 int err;
 int index;
 
-void *cab_pointers[AUDIO_NUM_BUFFERS];
+void *cab_pointers[AUDIO_FFT_NUM_BUFFERS];
 								// Pointers to buffers used in cab library
 
 double *inout;					// Array that will be used to create a
@@ -766,7 +766,7 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
 	fftw_free(inout);
 
 	// Construction of CAB pointers for fft buffers
-	for (index = 0; index < AUDIO_NUM_BUFFERS; ++index)
+	for (index = 0; index < AUDIO_FFT_NUM_BUFFERS; ++index)
 	{
 		cab_pointers[index] = STATIC_CAST(void*, &audio_state.fft.buffers[index]);
 	}
@@ -774,7 +774,7 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
 	// Initializing FFT CAB buffers, the pointers are copied to the cab
 	// structure
 	err = ptask_cab_init(&audio_state.fft.cab,
-						 AUDIO_NUM_BUFFERS,
+						 AUDIO_FFT_NUM_BUFFERS,
 						 AUDIO_DESIRED_PADBUFFER_SIZE,
 						 cab_pointers);
 
@@ -789,11 +789,10 @@ static inline int install_analysis()
 int err;
 int index;
 
-// FIXME: normalize use of AUDIO_MAX_FILES and AUDIO_NUM_BUFFERS constants
-void *cab_pointers[AUDIO_MAX_FILES];	// Pointers to buffers used in cab library
+void *cab_pointers[AUDIO_FFT_NUM_BUFFERS];	// Pointers to buffers used in cab library
 
 	// Construction of CAB pointers for analysis buffers
-	for (index = 0; index < AUDIO_MAX_FILES; ++index)
+	for (index = 0; index < AUDIO_FFT_NUM_BUFFERS; ++index)
 	{
 		cab_pointers[index] = STATIC_CAST(void*, audio_state.analysis.buffers[index]);
 	}
@@ -801,7 +800,7 @@ void *cab_pointers[AUDIO_MAX_FILES];	// Pointers to buffers used in cab library
 	// Initializing FFT CAB buffers, the pointers are copied to the cab
 	// structure
 	err = ptask_cab_init(&audio_state.analysis.cab,
-						 AUDIO_NUM_BUFFERS,
+						 AUDIO_FFT_NUM_BUFFERS,
 						 AUDIO_DESIRED_PADBUFFER_SIZE,
 						 cab_pointers);
 

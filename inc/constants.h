@@ -70,10 +70,17 @@
 /// Desired dimension of the buffer that will contain
 #define AUDIO_DESIRED_HALFBUFFER_SIZE	(AUDIO_DESIRED_HALFCOMPLEX)
 
-// TODO: actually this should be NTasks that use them + 1
-#define AUDIO_NUM_BUFFERS		(10)
-										///< Number of buffers related to audio
-										///< acquisition
+/// Number of buffers used to record audio.
+/// It is given as the count of tasks that can read/write recorded audio samples
+/// plus one.
+/// Such tasks are the microphone task, the fft task and the gui task
+#define AUDIO_REC_NUM_BUFFERS		(4)
+
+/// Number of buffers used to publish FFTs.
+/// It is given as the number of opened audio files (each potentially associated
+/// with a task), plus the FFT task, plus the gui task, plus one
+#define AUDIO_FFT_NUM_BUFFERS		(AUDIO_MAX_FILES+3)
+
 
 /// Converts a certain number of frames in milliseconds, given current
 /// capture rate
@@ -83,8 +90,6 @@
 /// The desired period of the audio acquisition task
 #define AUDIO_DESIRED_PERIOD \
 	FRAMES_TO_MS(AUDIO_DESIRED_FRAMES,AUDIO_DESIRED_RATE)
-
-// TODO: Add dimensions of buffers used for data analysis
 
 // -----------------------------------------------------------------------------
 //                           GRAPHIC CONSTANTS
