@@ -336,9 +336,6 @@ extern void ptask_start_period(ptask_t *ptask);
  *
  * This function shall be called by the task itself.
  *
- * NOTICE: Even though the task calls time_add_ms() after the wake‐up time, the
- * computation is correct.
- * TODO: remove this note?
  */
 extern void ptask_wait_for_period(ptask_t *ptask);
 

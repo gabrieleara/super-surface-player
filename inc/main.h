@@ -33,7 +33,8 @@ extern bool wcet_analysis();
  * Logs data on the console if the given log_level is compatible with the
  * system log level.
  */
-extern void print_log(int level, const char* format, ...) __attribute__ ((format (printf, 2, 3)));
+extern void print_log(int level, const char* format, ...)
+	__attribute__ ((format (printf, 2, 3)));
 
 /**
  * Returns the path of the current working directory.

@@ -81,7 +81,7 @@ typedef union __AUDIO_POINTER_UNION
 /// Opened audio file descriptor
 typedef struct __AUDIO_FILE_DESC_STRUCT
 {
-	// NOTE: When modifying the audio_file_desc_t data structure, consider
+	// NOTICE: When modifying the audio_file_desc_t data structure, consider
 	// which state should be adopted as default state.
 
 	audio_pointer_t datap;		///< Pointer to the opened file
@@ -176,7 +176,7 @@ typedef struct __AUDIO_ANALYSIS_STRUCT
 /// Global state of the module
 typedef struct __AUDIO_STRUCT
 {
-	// NOTE: When modifying the audio_state_t data structure, consider
+	// NOTICE: When modifying the audio_state_t data structure, consider
 	// which state should be adopted as default state.
 	audio_file_desc_t audio_files[AUDIO_MAX_FILES];
 								///< Array of opened audio files descriptors for
@@ -669,7 +669,7 @@ void *cab_pointers[AUDIO_REC_NUM_BUFFERS];
 								// Pointers to buffers used in cab library
 
 	// Allegro sound initialization
-	// IDEA: MIDI files do not work, consider enabling MIDI_AUTODETECT and
+	// MIDI files do not work, consider enabling MIDI_AUTODETECT and
 	// implement MIDI files support
 	err = install_sound(DIGI_AUTODETECT, MIDI_NONE, NULL);
 	if (err) return err;
@@ -1620,7 +1620,6 @@ int		missing;		// How many frames are missing
 		// While there is new data, keep capturing.
 		// NOTICE: This is NOT an infinite loop, because the code is many times
 		// faster than I/O.
-		// NOTE: Change with a maximum time limit if this is a problem.
 		while ((err = mic_read(buffer + how_many_read, missing)) > 0) {
 			how_many_read	+= err;
 			missing			-= err;
@@ -1668,9 +1667,8 @@ int		missing;		// How many frames are missing
 	return NULL;
 }
 
-/// The body of the fft task
-/// NOTICE: this task code is not reentrant, you can't have mutiple FFT Tasks
-/// running concurrently at the same moment
+/// The body of the fft task. Notice that only one instance at the time should
+/// be running.
 void *fft_task(void *arg)
 {
 ptask_t *tp; // task pointer
@@ -1710,10 +1708,11 @@ fft_output_t *out_pointer;
 		if (err != EAGAIN && time_cmp(last_timestamp, new_timestamp) < 0)
 		{
 			/*
+			// FIXME: remove this check when done
 			struct timespec prova;
 			time_diff(&prova, new_timestamp, last_timestamp);
 
-			printf("TASL_FFT since last SAMPLE: %lld.%.9ld seconds.\r\n", (long long)prova.tv_sec, prova.tv_nsec);
+			printf("TASK_FFT since last SAMPLE: %lld.%.9ld seconds.\r\n", (long long)prova.tv_sec, prova.tv_nsec);
 			*/
 
 			last_timestamp = new_timestamp;
@@ -1778,11 +1777,21 @@ ptask_t *tp; // task pointer
 
 // Local variables
 struct timespec last_timestamp = { .tv_sec = 0, .tv_nsec = 0};
-						// Timestamp of last accessed input buffer
-struct timespec new_timestamp;
-						// Timestamp of the new input buffer
+								// Timestamp of last accessed FFT
+struct timespec new_timestamp;	// Timestamp of the new FFT
 
-int file_index;			// Index of the file that has been associated with this task
+int file_index;					// Index of the file that has been associated
+								// with this task
+
+const fft_output_t *fft_ptr;	// The pointer to the most recent FFT
+								// within the CAB
+ptask_cab_id_t fft_id;			// The id of the most recent FFT within the CAB
+
+double correlation;				// The normalized correlation value between the
+								// most recent FFT and the audio sample
+								// associated with this task
+
+int err;
 
 	tp = STATIC_CAST(ptask_t *, arg);
 	// task_id = ptask_get_id(tp);
@@ -1794,16 +1803,11 @@ int file_index;			// Index of the file that has been associated with this task
 
 	ptask_start_period(tp);
 
-const fft_output_t *fft_ptr;
-ptask_cab_id_t buffer_id;
-int err;
-double correlation;
-
 	while (!main_get_tasks_terminate())
 	{
 		err = ptask_cab_getmes(&audio_state.fft.cab,
 			STATIC_CAST(const void **, &fft_ptr),
-			&buffer_id,
+			&fft_id,
 			&new_timestamp
 		);
 
@@ -1818,18 +1822,21 @@ double correlation;
 				fft_ptr->autocorr
 			);
 
-			print_log(LOG_VERBOSE, "Correlation with file %d is %f .\r\n", file_index+1, correlation);
+			print_log(LOG_VERBOSE,
+				"TASK_ALS correlation with file %d is %f .\r\n",
+				file_index+1, correlation);
 
-			// TODO: magic number
-			if (fabs(correlation) > 0.35) {
-				// TODO: insert time decay
+			if (fabs(correlation) > AUDIO_THRESHOLD) {
+				// We start every time a new execution, there is no need for a
+				// decay of the trigger because the time window is not exactly
+				// too small
 				audio_file_play(file_index);
 			}
 		}
 
 		// Realease acquired buffer (if acquired)
 		if (err == 0)
-			ptask_cab_unget(&audio_state.fft.cab, buffer_id);
+			ptask_cab_unget(&audio_state.fft.cab, fft_id);
 
 		if (ptask_deadline_miss(tp))
 			printf("TASK_ALS for file %d missed %d deadlines!\r\n",

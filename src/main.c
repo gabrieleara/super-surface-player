@@ -48,7 +48,7 @@
 /// Structure containing the global state of the program
 typedef struct __MAIN_STRUCT
 {
-	// NOTE: When modifying the main_state_t data structure, consider
+	// NOTICE: When modifying the main_state_t data structure, consider
 	// which state should be adopted as default state.
 
 	bool			tasks_terminate;///< Tells if concurrent tasks should stop
@@ -136,9 +136,6 @@ int len;
 	if (len > 0)
 		printf("Last allegro error is %s.\r\n", allegro_error);
 
-	// NOTE: A negative error may be due to ALSA library, consider using
-	// snd_strerr to print the error.
-
 	exit(EXIT_FAILURE);
 }
 
@@ -184,8 +181,6 @@ int err = 0;
 
 	switch (c)
 	{
-	// NOTE: Even if it is implemented, the verbose command does actually nothing
-	// NOTE: Even if it is implemented, the wcet_analysis command does actually nothing
 	case 'v':
 #ifdef NDEBUG
 		if (verbose())
@@ -204,9 +199,7 @@ int err = 0;
 			main_state.log_level |= LOG_WCET;
 		break;
 
-	// NOTE: More command line arguments may be placed.
-
-	// TODO: Implement a command line that automatically updates WCET for each
+	// IDEA: Implement a command line that automatically updates WCET for each
 	// task during program execution and prints at the end of each concurrent
 	// execution the calculated values for each task.
 
@@ -247,7 +240,7 @@ int			err = 0, i, len;
 const char*	str;
 
 int			cwdlen;
-char 		cwd[MAX_CHAR_BUFFER_SIZE];	// It will contain the current directory
+char		cwd[MAX_CHAR_BUFFER_SIZE];	// It will contain the current directory
 										// from which the program has been started.
 bool		directory_already_specified = false;
 										// If false we won't accept any other
@@ -454,6 +447,9 @@ int err;
 	}
 }
 
+/**
+ * Waits the user to press ENTER before going on with the program.
+ */
 static inline void wait_enter()
 {
 char buffer[MAX_CHAR_BUFFER_SIZE];
@@ -461,6 +457,9 @@ char buffer[MAX_CHAR_BUFFER_SIZE];
 	fgets(buffer, sizeof(buffer), stdin);
 }
 
+/**
+ * Forces the user to answer yes or no to a question.
+ */
 static inline bool ask_yes_no(char* query)
 {
 char buffer[MAX_CHAR_BUFFER_SIZE];	// Buffer containing the inserted values
@@ -494,6 +493,10 @@ bool yes = false;
 	return yes;
 }
 
+/**
+ * Lists all open audio files, displaying a '*' next to files with an
+ * associated recording.
+ */
 static inline void cmd_list_audio_files()
 {
 int i;
@@ -517,7 +520,10 @@ int i;
 	}
 }
 
-
+/**
+ * Records a sample for an opened audio file, overwriting any previous
+ * information.
+ */
 static inline void cmd_record(int fnum)
 {
 bool yes		= false;
@@ -592,6 +598,9 @@ int index = fnum-1;
 	}
 }
 
+/**
+ * Plays a previously recorded audio sample.
+ */
 static inline void cmd_playback(int fnum)
 {
 	audio_file_play_recorded_sample(fnum-1);
@@ -974,6 +983,12 @@ int err;
 	err = program_init();
 	if (err)
 		abort_on_error("Could not properly initialize the program.");
+
+	printf("Program initialized!\r\n");
+
+	print_log(LOG_VERBOSE,
+		"The desired period for audio tasks is %ld ms.\r\n",
+		AUDIO_DESIRED_PERIOD);
 
 	while (!main_state.quit)
 	{

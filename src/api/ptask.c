@@ -338,7 +338,6 @@ void ptask_wait_for_period(ptask_t *ptask)
 {
 	while (clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &(ptask->at), NULL) != 0)
 	{
-		// IDEA: Could it be a good idea to print that this thread has been interrupted?
 	}
 
 	time_add_ms(&(ptask->at), ptask->period);
@@ -411,7 +410,7 @@ static void _ptask_init_mutex_attr()
 {
 	pthread_mutexattr_init(&_matt);
 
-	// NOTE: Change to priority ceiling if needed
+	// NOTICE: Change to priority ceiling if needed
 	pthread_mutexattr_setprotocol(&_matt, PTHREAD_PRIO_INHERIT);
 }
 

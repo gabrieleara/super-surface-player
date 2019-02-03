@@ -59,6 +59,12 @@
 									///< The maximum number of keyboard commands
 									///< that can be handled in a single iteration
 
+// FIXME: REMOVE THIS
+/// Minimum value of deciBel displayed, less than this is zero pixels high
+// #define DB_MINIMUM			(-10.)
+/// Maximum value of deciBel displayed, more than this is saturated
+// #define DB_MAXIMUM			(100.)
+
 
 // -----------------------------------------------------------------------------
 //                             PRIVATE MACROS
@@ -122,7 +128,7 @@ typedef struct __GUI_STATIC_STRUCT
 /// Global state of the module
 typedef struct __GUI_STRUCT
 {
-	// NOTE: When modifying the main_state_t data structure, consider
+	// NOTICE: When modifying the main_state_t data structure, consider
 	// which state should be adopted as default state.
 
 	BITMAP*		virtual_screen;	///< Virtual screen, used to handle all gui
@@ -360,15 +366,14 @@ int num, i;
 
 /**
  * Converts a value of FFT energy into the height of its plot in pixels.
- * TODO: plot in dB!
  */
 int fft_average_to_height(double average) {
-// TODO: magic numbers
-#define DB_MINIMUM	(-10.) ///< Minimum value of deciBel displayed, less than this is zero pixels high
-#define DB_MAXIMUM	(100) ///< Maximum value of deciBel displayed, more than this is saturated
-
 int num_pixels;
 
+	// TODO: scaling
+	num_pixels = average / 5.;
+
+	/*
 	double value_log = (average > 0.) ? 20*log10f(average) : DB_MINIMUM;
 
 	if (value_log < DB_MINIMUM)
@@ -377,6 +382,7 @@ int num_pixels;
 		value_log = DB_MAXIMUM;
 
 	num_pixels = STATIC_CAST(int, (value_log-DB_MINIMUM) / (DB_MAXIMUM - DB_MINIMUM) * FFT_PLOT_HEIGHT);
+	*/
 
 	if (num_pixels > FFT_PLOT_HEIGHT)
 		return FFT_PLOT_HEIGHT;
@@ -386,24 +392,6 @@ int num_pixels;
 
 	return num_pixels;
 }
-
-/*
-static inline void max_min_amplitude(const double amplitudes[], const int frames,
-	double *maximum_ptr, double *minimum_ptr)
-{
-int i;
-	*maximum_ptr = *minimum_ptr = amplitudes[0];
-
-	for (i = 1; i < frames;++i)
-	{
-		if (amplitudes[i] > *maximum_ptr)
-			*maximum_ptr = amplitudes[i];
-		else if (amplitudes[i] < *minimum_ptr)
-			*minimum_ptr = amplitudes[i];
-	}
-
-}
-*/
 
 /**
  * Draws the actual fft plot, given the array of amplitudes associated with each
@@ -438,12 +426,8 @@ int last_index;				// The index of the last frequency (partially)
 int pixel_offset;			// The offset of the current pixel within the FFT plot
 int i;
 
-// double maximum, minimum;
-
 	frame_window_per_pixel = STATIC_CAST(double,frames) /
 		STATIC_CAST(double,FFT_PLOT_WIDTH);
-
-	// max_min_amplitude(amplitudes, frames, &maximum, &minimum);
 
 	// Initializing variables for first iteration.
 	// The loop uses some optimizations to avoid calculating multiple times
@@ -493,6 +477,7 @@ int i;
 /**
  * Draws the FFT of the (last) recorded audio on the screen.
  */
+// TODO: scale and backround.
 static inline void draw_fft()
 {
 int buffer_index;		// The index of the fft buffer from the cab, used to

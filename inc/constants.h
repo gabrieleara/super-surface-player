@@ -40,10 +40,14 @@
 										///< be a dimension equal to the number
 										///< of frames.
 
+/// The treshold that is used to check whether the recorded audio corresponds to
+/// a given audio sample
+#define AUDIO_THRESHOLD			(0.3) // 0.35
+
 /// Desired number of frames contained in an audio sample.
 /// It should be a power of two to make the FFT computation way faster.
 /// NOTICE: the bigger this number, the bigger the latency.
-#define AUDIO_DESIRED_FRAMES	(8*1024) // FIXME: (around 0.18 seconds)
+#define AUDIO_DESIRED_FRAMES	(8*1024)
 
 /// Adds padding to the specified number if the zero padding is enabled,
 /// otherwise does nothing.
@@ -88,6 +92,10 @@
 	((1000L * STATIC_CAST(long,frames)) / STATIC_CAST(long,rate))
 
 /// The desired period of the audio acquisition task
+/// The current configuration leads to a window about 0.186 seconds wide when
+/// recording data (more precisely, an expected time window is
+/// 185.7596371882086 milliseconds, but the actutal period is truncated to
+/// 185 ms).
 #define AUDIO_DESIRED_PERIOD \
 	FRAMES_TO_MS(AUDIO_DESIRED_FRAMES,AUDIO_DESIRED_RATE)
 
@@ -183,7 +191,6 @@
 	|__________________________________________________________|
 
 	The side panel contains the list of all the files opened by the program.
-	IDEA: Colors will provide an indication whether a file is currently in execution.
 */
 
 //@}
@@ -301,7 +308,7 @@
 
 	The FFT panel contains the FFT of the sound received from the recorder.
 	The scale and background are contained in a bitmap file, thus they are
-	static. TODO: scale and backround.
+	static.
 */
 
 //@}
@@ -379,7 +386,7 @@
 /// The maximum height of the time plot content
 #define TIME_MAX_HEIGHT		((TIME_PLOT_HEIGHT - 1 - (2 * TIME_P)))
 /// The amplitude which corresponds to the maximum height
-#define TIME_MAX_AMPLITUDE	(100000000)
+#define TIME_MAX_AMPLITUDE	(1000000000)
 
 
 
@@ -402,9 +409,11 @@
 #define TASK_FFT		(3)
 #define TASK_ALS_FIRST	(4)
 
+/// Maximum number of tasks which may be running at any time
 #define	TASK_NUM		(TASK_ALS_FIRST + AUDIO_MAX_FILES)
 
-#define WCET_UNKNOWN (0)
+///
+#define WCET_UNKNOWN	(0)
 
 #ifdef NDEBUG
 	#define GET_PRIO(prio) (prio)	///< If not in debug mode, this does nothing
@@ -412,46 +421,48 @@
 	#define GET_PRIO(prio) (0)		///< In debug mode real time scheduling is
 #endif								///< disabled, so priority must be zero
 
-// TODO: Periods of tasks should be chosen in a more rigorous manneer, perform
-// a scheduling analysis once all tasks are correctly defined. Also, priority
-// between tasks should be defined in terms of the results of said
-// schedulability analysis.
+// Tasks priorities are chosen following RM guidelines, even if the UI task has
+// a lower priority than the microphone tasks because the responsiveness to the
+// microphone inputs has a much greater importance than responsiveness to
+// keyboard/mouse inputs.
 
 // GUI TASK
 
 #define TASK_GUI_WCET		(WCET_UNKNOWN)
-#define TASK_GUI_PERIOD		(30)	///< a little more than 30 fps
-#define TASK_GUI_DEADLINE	(30)	///< same as period
-#define TASK_GUI_PRIORITY	(1)		///< lowest priority, missing a frame is not a big deal
+#define TASK_GUI_PERIOD		(16)	///< A little more than 60 fps
+#define TASK_GUI_DEADLINE	(TASK_GUI_PERIOD)
+#define TASK_GUI_PRIORITY	(1)
+									///< Lowest priority, missing a frame is not
+									///< a big deal, system responsiveness is
+									///< much more important
 
 // USER INTERACTION TASK
 
 #define TASK_UI_WCET		(WCET_UNKNOWN)
-#define TASK_UI_PERIOD		(10)
+#define TASK_UI_PERIOD		(10)	///< A hundred times per second
 #define TASK_UI_DEADLINE	(10)
 #define TASK_UI_PRIORITY	(2)
 
 // MICROPHONE TASK
 
 #define TASK_MIC_WCET		(WCET_UNKNOWN)
-#define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD / 10)
+#define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD)
 #define TASK_MIC_DEADLINE 	(TASK_MIC_PERIOD)
 #define TASK_MIC_PRIORITY	(4)
 
 // FFT TASK
 
 #define TASK_FFT_WCET		(WCET_UNKNOWN)
-#define TASK_FFT_PERIOD		(AUDIO_DESIRED_PERIOD / 10)
+#define TASK_FFT_PERIOD		(AUDIO_DESIRED_PERIOD)
 #define TASK_FFT_DEADLINE	(TASK_FFT_PERIOD)
-#define TASK_FFT_PRIORITY	(3)
+#define TASK_FFT_PRIORITY	(4)
+
+// ANALYSIS TASK (which may me many)
 
 #define TASK_ALS_WCET		(WCET_UNKNOWN)
-#define TASK_ALS_PERIOD		(AUDIO_DESIRED_PERIOD / 10)
+#define TASK_ALS_PERIOD		(AUDIO_DESIRED_PERIOD)
 #define TASK_ALS_DEADLINE	(TASK_ALS_PERIOD)
-#define TASK_ALS_PRIORITY	(5)
-
-
-// TODO: Define characteristics of each ANALYSIS TASK
+#define TASK_ALS_PRIORITY	(4)
 
 //@}
 
