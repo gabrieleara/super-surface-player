@@ -318,22 +318,41 @@
  */
 //@{
 
-#define FFT_P		(PADDING * 2)			///< FFT panel padding
+#define FFT_P		(PADDING)			///< FFT panel padding
 #define FFT_X		(WIN_X + FFT_P)			///< FFT panel position x
 #define FFT_Y		(WIN_Y + FFT_P)			///< FFT panel position y
 #define FFT_MX		(SIDE_X - FFT_P)		///< FFT panel max x
 #define FFT_MY		(FOOTER_Y/2 - FFT_P)	///< FFT panel max y
 
 #define FFT_PLOT_X	(FFT_X + FFT_P)			///< FFT plot position x
-#define FFT_PLOT_Y	(FFT_Y + FFT_P)			///< FFT plot position y
-#define FFT_PLOT_MX	(FFT_MX - FFT_P)		///< FFT plot max x
-#define FFT_PLOT_MY	(FFT_MY - FFT_P)		///< FFT plot max y
+#define FFT_PLOT_Y	(FFT_Y + FFT_P)		///< FFT plot position y
+#define FFT_PLOT_MX	(FFT_MX - 50)			///< FFT plot max x
+#define FFT_PLOT_MY	(FFT_MY - 2 * FFT_P)	///< FFT plot max y
 
-///< FFT plot width
+/// FFT plot width
 #define FFT_PLOT_WIDTH	(FFT_PLOT_MX - FFT_PLOT_X)
 
-///< FFT plot height
+/// FFT plot height
 #define FFT_PLOT_HEIGHT	(FFT_PLOT_MY - FFT_PLOT_Y)
+
+#define FFT_PLOT_X_TICKS	(10)	///< Number of ticks on the FFT plot X scale
+#define FFT_PLOT_Y_TICKS	(5)		///< Number of ticks on the FFT plot Y scale
+
+/// FFT panel X scale position y
+#define FFT_PLOT_X_SCALE_Y			(FFT_PLOT_MY + 5)
+/// FFT panel X scale position my (tick)
+#define FFT_PLOT_X_SCALE_MY			(FFT_PLOT_X_SCALE_Y + 5)
+/// FFT panel X scale label position y
+#define FFT_PLOT_X_SCALE_LABEL_Y	(FFT_PLOT_X_SCALE_MY + 5)
+/// FFT panel X scale unit position x
+#define FFT_PLOT_X_SCALE_UNIT_X		(FFT_PLOT_MX + 30)
+/// FFT panel X scale unit position y
+#define FFT_PLOT_X_SCALE_UNIT_Y		(FFT_PLOT_X_SCALE_LABEL_Y)
+
+/// FFT panel Y scale position mx (tick)
+#define FFT_PLOT_Y_SCALE_MX			(FFT_PLOT_X - 5)
+/// FFT panel Y scale position x
+#define FFT_PLOT_Y_SCALE_X			(FFT_PLOT_Y_SCALE_MX - 5)
 
 /*
 	 __________________________________________________________

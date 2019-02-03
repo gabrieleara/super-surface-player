@@ -183,6 +183,144 @@ static gui_state_t gui_state =
 //@{
 
 /**
+ * Prints the vertical axis and scale for the FFT plot.
+ */
+static inline void draw_fft_vertical_scale(BITMAP* background)
+{
+int pixel_increase; // The number of pixels between each tick
+// int freq_increase;	// The frequency span between two ticks
+int pixel_offset;	// The column where to print the label
+// int freq_next;		// The next label to print
+// char buffer[6];		// Buffer used to print text on the background
+int i;
+
+	pixel_offset	= 0;
+	// freq_next		= 0;
+	pixel_increase	= (FFT_PLOT_HEIGHT-2) / FFT_PLOT_Y_TICKS;
+	// freq_increase	= audio_get_fft_rrate() / 2 / FFT_PLOT_Y_TICKS;
+
+	printf("FFT_PLOT_HEIGHT %d\r\n", FFT_PLOT_HEIGHT);
+
+	for(i = 0; i <= FFT_PLOT_Y_TICKS; ++i)
+	{
+		// Draw the tick
+		rectfill(background,
+			FFT_PLOT_Y_SCALE_X,
+			FFT_PLOT_Y	+ pixel_offset,
+			FFT_PLOT_Y_SCALE_MX,
+			FFT_PLOT_Y	+ pixel_offset + 1,
+			COLOR_TEXT_PRIM
+		);
+
+		// sprintf(buffer, "%d", freq_next);
+		/*
+		textout_centre_ex(background,
+			font,
+			buffer,
+			FFT_PLOT_X	+ pixel_offset,
+			FFT_PLOT_MY	+ 10,
+			COLOR_TEXT_PRIM,
+			COLOR_BKG
+		);
+		*/
+
+		pixel_offset += pixel_increase;
+		// freq_next += freq_increase;
+	}
+
+	rectfill(background,
+		FFT_PLOT_Y_SCALE_MX,
+		FFT_PLOT_Y,
+		FFT_PLOT_Y_SCALE_MX - 1,
+		FFT_PLOT_MY-1,
+		COLOR_TEXT_PRIM
+	);
+
+	/*
+	textout_ex(background,
+		font,
+		"Hz",
+		FFT_PLOT_MX + 30,
+		FFT_PLOT_MY + 10,
+		COLOR_TEXT_PRIM,
+		COLOR_BKG);
+	*/
+}
+
+/**
+ * Prints the horizontal axis and scale for the FFT plot.
+ */
+static inline void draw_fft_horizontal_scale(BITMAP* background)
+{
+int pixel_increase; // The number of pixels between each tick
+int freq_increase;	// The frequency span between two ticks
+int pixel_offset;	// The column where to print the label
+int freq_next;		// The next label to print
+char buffer[6];		// Buffer used to print text on the background
+int i;
+
+	pixel_offset	= 0;
+	freq_next		= 0;
+	pixel_increase	= FFT_PLOT_WIDTH / FFT_PLOT_X_TICKS;
+	freq_increase	= audio_get_fft_rrate() / 2 / FFT_PLOT_X_TICKS;
+
+	printf("FFT_PLOT_WIDTH %d\r\n", FFT_PLOT_WIDTH);
+
+	for(i = 0; i <= FFT_PLOT_X_TICKS; ++i)
+	{
+		// Draw the tick
+		rectfill(background,
+			FFT_PLOT_X	+ pixel_offset,
+			FFT_PLOT_X_SCALE_Y,
+			FFT_PLOT_X	+ pixel_offset +1,
+			FFT_PLOT_X_SCALE_MY,
+			COLOR_TEXT_PRIM
+		);
+
+		sprintf(buffer, "%d", freq_next);
+
+		textout_centre_ex(background,
+			font,
+			buffer,
+			FFT_PLOT_X	+ pixel_offset,
+			FFT_PLOT_X_SCALE_LABEL_Y,
+			COLOR_TEXT_PRIM,
+			COLOR_BKG
+		);
+
+		pixel_offset += pixel_increase;
+		freq_next += freq_increase;
+	}
+
+	rectfill(background,
+		FFT_PLOT_X,
+		FFT_PLOT_X_SCALE_Y,
+		FFT_PLOT_X	+ FFT_PLOT_WIDTH,
+		FFT_PLOT_X_SCALE_Y + 1,
+		COLOR_TEXT_PRIM
+	);
+
+	textout_ex(background,
+		font,
+		"Hz",
+		FFT_PLOT_X_SCALE_UNIT_X,
+		FFT_PLOT_X_SCALE_UNIT_Y,
+		COLOR_TEXT_PRIM,
+		COLOR_BKG);
+}
+
+/**
+ * Prints the axes and scales for the FFT plot on the given pointer to the
+ * background. They are dynamically generated only the first time the GUI is
+ * loaded.
+ */
+static inline void draw_fft_scales(BITMAP* background)
+{
+	draw_fft_horizontal_scale(background);
+	draw_fft_vertical_scale(background);
+}
+
+/**
  * If not previously initialized, loads all the interface static members.
  * It can be called multiple times, but the body will be only executed the first
  * time.
@@ -226,6 +364,8 @@ gui_static_t	static_screen;	// Holds all the static interface elements
 	if (bitmap_ptr == NULL) return EINVAL;
 
 	static_screen.element_midi	= bitmap_ptr;
+
+	draw_fft_scales(static_screen.background);
 
 	// Save static data and create virtual screen bitmap
 	gui_state.static_screen		= static_screen;
@@ -459,7 +599,6 @@ int i;
 /**
  * Draws the FFT of the (last) recorded audio on the screen.
  */
-// TODO: scale and backround.
 static inline void draw_fft()
 {
 int buffer_index;		// The index of the fft buffer from the cab, used to
@@ -470,12 +609,10 @@ static double amplitudes[AUDIO_DESIRED_HALFCOMPLEX];
 						// output in half-complex format.
 						// However, to display it we will simply plot the norm
 						// of said complex numbers
-int rrate;				// Actual acquisition rate
 int rframes;			// Number of frames per audio sample, which is also the
 						// number of values within the fft buffer
 int i;
 
-	rrate	= audio_get_fft_rrate();
 	rframes = audio_get_last_fft(&buffer, &buffer_index);
 
 	if (rframes < 1)
