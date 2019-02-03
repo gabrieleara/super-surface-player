@@ -199,8 +199,6 @@ int i;
 	pixel_increase	= (FFT_PLOT_HEIGHT-2) / FFT_PLOT_Y_TICKS;
 	// freq_increase	= audio_get_fft_rrate() / 2 / FFT_PLOT_Y_TICKS;
 
-	printf("FFT_PLOT_HEIGHT %d\r\n", FFT_PLOT_HEIGHT);
-
 	for(i = 0; i <= FFT_PLOT_Y_TICKS; ++i)
 	{
 		// Draw the tick
@@ -264,8 +262,6 @@ int i;
 	pixel_increase	= FFT_PLOT_WIDTH / FFT_PLOT_X_TICKS;
 	freq_increase	= audio_get_fft_rrate() / 2 / FFT_PLOT_X_TICKS;
 
-	printf("FFT_PLOT_WIDTH %d\r\n", FFT_PLOT_WIDTH);
-
 	for(i = 0; i <= FFT_PLOT_X_TICKS; ++i)
 	{
 		// Draw the tick
@@ -320,6 +316,139 @@ static inline void draw_fft_scales(BITMAP* background)
 	draw_fft_vertical_scale(background);
 }
 
+
+/**
+ * Prints the vertical axis and scale for the TIME plot.
+ */
+static inline void draw_time_vertical_scale(BITMAP* background)
+{
+int pixel_increase; // The number of pixels between each tick
+// int freq_increase;	// The frequency span between two ticks
+int pixel_offset;	// The column where to print the label
+// int freq_next;		// The next label to print
+// char buffer[6];		// Buffer used to print text on the background
+int i;
+
+	pixel_offset	= 0;
+	// freq_next		= 0;
+	pixel_increase	= (TIME_PLOT_HEIGHT-2) / TIME_PLOT_Y_TICKS;
+	// freq_increase	= audio_get_TIME_rrate() / 2 / TIME_PLOT_Y_TICKS;
+
+	for(i = 0; i <= TIME_PLOT_Y_TICKS; ++i)
+	{
+		// Draw the tick
+		rectfill(background,
+			TIME_PLOT_Y_SCALE_X,
+			TIME_PLOT_Y	+ pixel_offset,
+			TIME_PLOT_Y_SCALE_MX,
+			TIME_PLOT_Y	+ pixel_offset + 1,
+			COLOR_TEXT_PRIM
+		);
+
+		// sprintf(buffer, "%d", freq_next);
+		/*
+		textout_centre_ex(background,
+			font,
+			buffer,
+			TIME_PLOT_X	+ pixel_offset,
+			TIME_PLOT_MY	+ 10,
+			COLOR_TEXT_PRIM,
+			COLOR_BKG
+		);
+		*/
+
+		pixel_offset += pixel_increase;
+		// freq_next += freq_increase;
+	}
+
+	rectfill(background,
+		TIME_PLOT_Y_SCALE_MX,
+		TIME_PLOT_Y,
+		TIME_PLOT_Y_SCALE_MX - 1,
+		TIME_PLOT_MY-1,
+		COLOR_TEXT_PRIM
+	);
+
+	/*
+	textout_ex(background,
+		font,
+		"Hz",
+		TIME_PLOT_MX + 30,
+		TIME_PLOT_MY + 10,
+		COLOR_TEXT_PRIM,
+		COLOR_BKG);
+	*/
+}
+
+/**
+ * Prints the horizontal axis and scale for the TIME plot.
+ */
+static inline void draw_time_horizontal_scale(BITMAP* background)
+{
+int pixel_increase; // The number of pixels between each tick
+int pixel_offset;	// The column where to print the label
+char buffer[6];		// Buffer used to print text on the background
+int i;
+
+	pixel_offset	= TIME_PLOT_WIDTH-1;
+	// This is a little more tricky, I want to print one tick per second backwards,
+	// until I reach the maximum number of ticks
+	pixel_increase = TIME_ACTUAL_SPEED * (1000 / TASK_GUI_PERIOD);
+
+
+	for(i = 0; pixel_offset >= 0; --i)
+	{
+		// Draw the tick
+		rectfill(background,
+			TIME_PLOT_X	+ pixel_offset,
+			TIME_PLOT_X_SCALE_Y,
+			TIME_PLOT_X	+ pixel_offset +1,
+			TIME_PLOT_X_SCALE_MY,
+			COLOR_TEXT_PRIM
+		);
+
+		sprintf(buffer, "%d", i);
+
+		textout_centre_ex(background,
+			font,
+			buffer,
+			TIME_PLOT_X	+ pixel_offset,
+			TIME_PLOT_X_SCALE_LABEL_Y,
+			COLOR_TEXT_PRIM,
+			COLOR_BKG
+		);
+
+		pixel_offset -= pixel_increase;
+	}
+
+	rectfill(background,
+		TIME_PLOT_X,
+		TIME_PLOT_X_SCALE_Y,
+		TIME_PLOT_X	+ TIME_PLOT_WIDTH,
+		TIME_PLOT_X_SCALE_Y + 1,
+		COLOR_TEXT_PRIM
+	);
+
+	textout_ex(background,
+		font,
+		"s",
+		TIME_PLOT_X_SCALE_UNIT_X,
+		TIME_PLOT_X_SCALE_UNIT_Y,
+		COLOR_TEXT_PRIM,
+		COLOR_BKG);
+}
+
+/**
+ * Prints the axes and scales for the time plot on the given pointer to the
+ * background. They are dynamically generated only the first time the GUI is
+ * loaded.
+ */
+static inline void draw_time_scales(BITMAP* background)
+{
+	draw_time_horizontal_scale(background);
+	draw_time_vertical_scale(background);
+}
+
 /**
  * If not previously initialized, loads all the interface static members.
  * It can be called multiple times, but the body will be only executed the first
@@ -366,6 +495,7 @@ gui_static_t	static_screen;	// Holds all the static interface elements
 	static_screen.element_midi	= bitmap_ptr;
 
 	draw_fft_scales(static_screen.background);
+	draw_time_scales(static_screen.background);
 
 	// Save static data and create virtual screen bitmap
 	gui_state.static_screen		= static_screen;
@@ -715,6 +845,8 @@ static BITMAP *amplitude_bitmap = NULL;	// Static object used to store the
 
 int amplitude;			// The height of the most recent computed amplitude
 
+static bool skip = true;
+
 	// Static initialization on first run
 	if (amplitude_bitmap == NULL)
 	{
@@ -729,6 +861,24 @@ int amplitude;			// The height of the most recent computed amplitude
 			TIME_PLOT_WIDTH,
 			TIME_PLOT_HEIGHT);
 	}
+
+	if (TIME_SHOULD_SKIP)
+	{
+		skip = !skip;
+		if (skip)
+		{
+			// Reprint the previous one and return
+			blit(amplitude_bitmap, gui_state.virtual_screen,
+				0,
+				0,
+				TIME_PLOT_X,
+				TIME_PLOT_Y,
+				TIME_PLOT_WIDTH,
+				TIME_PLOT_HEIGHT);
+			return;
+		}
+	}
+
 
 	// Copy back the plot on the virtual screen from the history bitmap, which
 	// is already shifted by TIME_SPEED amount.
@@ -750,10 +900,10 @@ int amplitude;			// The height of the most recent computed amplitude
 	// TIME_SPEED pixels and the height depends linearly on the amplitude, as
 	// computed above.
 	rectfill(gui_state.virtual_screen,
-			 TIME_PLOT_MX - TIME_SPEED - 1,
-			 TIME_PLOT_MY - amplitude - 1,
-			 TIME_PLOT_MX - 2,
-			 TIME_PLOT_MY - 1,
+			 TIME_PLOT_MX - TIME_FILL - 1 ,
+			 TIME_PLOT_MIDDLE - amplitude,
+			 TIME_PLOT_MX - 1,
+			 TIME_PLOT_MIDDLE + amplitude,
 			 COLOR_ACCENT);
 
 	// Shift the plot on the virtual screen for next execution.

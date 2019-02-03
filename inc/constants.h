@@ -325,7 +325,7 @@
 #define FFT_MY		(FOOTER_Y/2 - FFT_P)	///< FFT panel max y
 
 #define FFT_PLOT_X	(FFT_X + FFT_P)			///< FFT plot position x
-#define FFT_PLOT_Y	(FFT_Y + FFT_P)		///< FFT plot position y
+#define FFT_PLOT_Y	(FFT_Y + FFT_P)			///< FFT plot position y
 #define FFT_PLOT_MX	(FFT_MX - 50)			///< FFT plot max x
 #define FFT_PLOT_MY	(FFT_MY - 2 * FFT_P)	///< FFT plot max y
 
@@ -383,29 +383,57 @@
  */
 //@{
 
-#define TIME_P	(PADDING*2)				///< Time panel padding
+#define TIME_P	(PADDING)				///< Time panel padding
 #define TIME_X	(0)						///< Time panel position x
-#define TIME_Y	(FOOTER_Y/2 + TIME_P)	///< Time panel position y
+#define TIME_Y	(FOOTER_Y/2 + 2*TIME_P)	///< Time panel position y
 #define TIME_MX	(SIDE_X)				///< Time panel max x
 #define TIME_MY	(FOOTER_Y)				///< Time panel max y
 
-#define TIME_PLOT_X		(TIME_X + TIME_P)	///< Time plot position x
-#define TIME_PLOT_Y		(TIME_Y + TIME_P)	///< Time plot position y
-#define TIME_PLOT_MX	(TIME_MX - TIME_P)	///< Time plot max x
-#define TIME_PLOT_MY	(TIME_MY - TIME_P)	///< Time plot max y
+#define TIME_PLOT_X		(TIME_X + 2*TIME_P)		///< Time plot position x
+#define TIME_PLOT_Y		(TIME_Y + TIME_P)		///< Time plot position y
+#define TIME_PLOT_MX	(TIME_MX - 50)			///< Time plot max x
+#define TIME_PLOT_MY	(TIME_MY - 4*TIME_P)	///< Time plot max y
 
 /// Time plot width
 #define TIME_PLOT_WIDTH		(TIME_PLOT_MX - TIME_PLOT_X)
 /// Time plot height
 #define TIME_PLOT_HEIGHT	(TIME_PLOT_MY - TIME_PLOT_Y)
+/// Time plot middle position
+#define TIME_PLOT_MIDDLE	((TIME_PLOT_Y + TIME_PLOT_MY) / 2)
 
 /// The speed at which the time plot moves (in pixels per frame)
-#define TIME_SPEED			(1)
+#define TIME_SPEED			(4)
+/// Number of frames the time plot should skip before printing the next one
+#define TIME_SHOULD_SKIP	(1)
+/// The actual speed of the plot
+#define TIME_ACTUAL_SPEED	(TIME_SPEED / (TIME_SHOULD_SKIP+1))
+/// The width of the bar, as a fraction of TIME_SPEED
+#define TIME_FILL			(2)
 
 /// The maximum height of the time plot content
-#define TIME_MAX_HEIGHT		((TIME_PLOT_HEIGHT - 1 - (2 * TIME_P)))
+#define TIME_MAX_HEIGHT		(TIME_PLOT_HEIGHT/2)
 /// The amplitude which corresponds to the maximum height
-#define TIME_MAX_AMPLITUDE	(1000000000)
+#define TIME_MAX_AMPLITUDE	(1000000000/2)
+
+#define TIME_PLOT_X_TICKS	(10)	///< Number of ticks on the TIME plot X scale
+#define TIME_PLOT_Y_TICKS	(4)		///< Number of ticks on the TIME plot Y scale
+
+/// TIME panel X scale position y
+#define TIME_PLOT_X_SCALE_Y				(TIME_PLOT_MY + 5)
+/// TIME panel X scale position my (tick)
+#define TIME_PLOT_X_SCALE_MY			(TIME_PLOT_X_SCALE_Y + 5)
+/// TIME panel X scale label position y
+#define TIME_PLOT_X_SCALE_LABEL_Y		(TIME_PLOT_X_SCALE_MY + 5)
+/// TIME panel X scale unit position x
+#define TIME_PLOT_X_SCALE_UNIT_X		(TIME_PLOT_MX + 20)
+/// TIME panel X scale unit position y
+#define TIME_PLOT_X_SCALE_UNIT_Y		(TIME_PLOT_X_SCALE_LABEL_Y)
+
+/// TIME panel Y scale position mx (tick)
+#define TIME_PLOT_Y_SCALE_MX			(TIME_PLOT_X - 5)
+/// TIME panel Y scale position x
+#define TIME_PLOT_Y_SCALE_X				(TIME_PLOT_Y_SCALE_MX - 5)
+
 
 
 
@@ -449,6 +477,7 @@
 
 #define TASK_GUI_WCET		(WCET_UNKNOWN)
 #define TASK_GUI_PERIOD		(16)	///< A little more than 60 fps
+// #define TASK_GUI_PERIOD		(30)	///< A little more than 30 fps
 #define TASK_GUI_DEADLINE	(TASK_GUI_PERIOD)
 #define TASK_GUI_PRIORITY	(1)
 									///< Lowest priority, missing a frame is not
