@@ -1708,7 +1708,7 @@ fft_output_t *out_pointer;
 		if (err != EAGAIN && time_cmp(last_timestamp, new_timestamp) < 0)
 		{
 			/*
-			// FIXME: remove this check when done
+			// TODO: remove this check when done
 			struct timespec prova;
 			time_diff(&prova, new_timestamp, last_timestamp);
 
