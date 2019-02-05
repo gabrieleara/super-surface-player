@@ -525,7 +525,7 @@ int index = fnum-1;
 		"file number %d.\r\n", fnum);
 
 	yes = ask_yes_no("This will override any previously recorded sample "
-		"associated with said audio file, are you sure?");
+		"associated with said audio file.\r\nAre you sure?");
 
 	if (!yes)
 	{
@@ -535,7 +535,8 @@ int index = fnum-1;
 
 	while (!accepted && again)
 	{
-		printf("You choose to record a new entry, the program will start recording after exactly 5 seconds after your next input.\r\n");
+		printf("You choose to record a new entry.\r\nThe program will start "
+			"recording after exactly 5 seconds after your next input.\r\n");
 
 		wait_enter();
 		printf("\r\n");

@@ -404,7 +404,8 @@ double m = v[0];
  * This can be used to calculate the auto-correlatino of a fft with itself,
  * since first_fft and second_fft can be the same vector.
  */
-static inline double correlation_non_normalized(const double *first_fft, const double *second_fft)
+static inline double correlation_non_normalized(
+	const double *first_fft, const double *second_fft)
 {
 double *buffer;
 ptask_cab_id_t index;
@@ -428,7 +429,8 @@ ptask_cab_id_t index;
  * Normalization is computed by means of the auto-correlation of each of the
  * given FFTs, which can be computed using correlation_non_normalized().
  */
-static inline double correlation_normalized(const double *first_fft, const double *second_fft,
+static inline double correlation_normalized(
+	const double *first_fft, const double *second_fft,
 	double first_autocorr, double second_autocorr)
 {
 	double unnormalized = correlation_non_normalized(first_fft, second_fft);
