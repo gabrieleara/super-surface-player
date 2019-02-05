@@ -566,7 +566,7 @@ int index = fnum-1;
 
 		if (!accepted)
 		{
-			again = ask_yes_no("Do you wish to record another sample? "
+			again = ask_yes_no("Do you wish to record another sample?\r\n"
 				"If you answer no the recorded sample will be discarded.");
 
 			if (!again)
