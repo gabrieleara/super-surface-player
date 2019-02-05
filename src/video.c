@@ -633,8 +633,7 @@ int num, i;
 int fft_average_to_height(double average) {
 int num_pixels;
 
-	// TODO: scaling
-	num_pixels = average / 5.;
+	num_pixels = average / FFT_PLOT_SCALING;
 
 	if (num_pixels > FFT_PLOT_HEIGHT)
 		return FFT_PLOT_HEIGHT;
@@ -1013,7 +1012,6 @@ int scancode;
 				// Request main module to terminate the current session
 				main_terminate_tasks();
 				break;
-			// IDEA: Implement global volume controls, Up/Down.
 			default:
 				// Do nothing
 				break;

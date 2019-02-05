@@ -154,8 +154,7 @@
 									///< used by child elements
 
 //-------------------------------------------------------------
-// The Footer will contain some messages printed by the program
-// IDEA: change this with some commands
+// The Footer is actually just an orange rectangle
 //-------------------------------------------------------------
 
 //@}
@@ -352,6 +351,9 @@
 #define FFT_PLOT_Y_SCALE_MX			(FFT_PLOT_X - 5)
 /// FFT panel Y scale position x
 #define FFT_PLOT_Y_SCALE_X			(FFT_PLOT_Y_SCALE_MX - 5)
+
+/// The scaling of the FFT plot with respect to the computed energy value
+#define FFT_PLOT_SCALING			(5.)
 
 /*
 	 __________________________________________________________
