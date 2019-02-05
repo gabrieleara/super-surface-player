@@ -25,11 +25,6 @@
 extern bool verbose();
 
 /**
- * Returns true if the wcet_analysis flag is set.
- */
-extern bool wcet_analysis();
-
-/**
  * Logs data on the console if the given log_level is compatible with the
  * system log level.
  */

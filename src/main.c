@@ -95,11 +95,6 @@ bool verbose()
 	return main_state.log_level & LOG_VERBOSE;
 }
 
-bool wcet_analysis()
-{
-	return main_state.log_level & LOG_WCET;
-}
-
 /**
  * Returns the log level mask of the system.
  */
@@ -191,18 +186,6 @@ int err = 0;
 			// repeated flags are not checked
 			main_state.log_level |= LOG_VERBOSE;
 		break;
-
-	case 'w':
-		if (wcet_analysis())
-			err = EINVAL;
-		else
-			main_state.log_level |= LOG_WCET;
-		break;
-
-	// IDEA: Implement a command line that automatically updates WCET for each
-	// task during program execution and prints at the end of each concurrent
-	// execution the calculated values for each task.
-
 	default:
 		// Unknown argument
 		err = EINVAL;
@@ -782,24 +765,6 @@ static inline int start_microphone_task()
 }
 
 /**
- * Initializes and starts the FFT task, returning zero on success.
- */
-static inline int start_fft_task()
-{
-	return
-		ptask_short(
-			&main_state.tasks[TASK_FFT],
-			TASK_FFT_WCET,
-			TASK_FFT_PERIOD,
-			TASK_FFT_DEADLINE,
-			GET_PRIO(TASK_FFT_PRIORITY),
-			fft_task,
-			NULL,
-			0);
-}
-
-
-/**
  * Initializes and starts the analyzer task, returning zero on success.
  */
 static inline int start_analyzer_tasks()
@@ -861,9 +826,6 @@ int err;
 	err = start_microphone_task();
 	if (err) return err;
 
-	err = start_fft_task();
-	if (err) return err;
-
 	err = start_analyzer_tasks();
 	return err;
 }
@@ -876,7 +838,6 @@ static inline void join_tasks()
 	ptask_join(&main_state.tasks[TASK_UI]);
 	ptask_join(&main_state.tasks[TASK_GUI]);
 	ptask_join(&main_state.tasks[TASK_MIC]);
-	ptask_join(&main_state.tasks[TASK_FFT]);
 
 	int num_recording_files = 0;
 	int i;

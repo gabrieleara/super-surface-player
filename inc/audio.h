@@ -205,7 +205,8 @@ extern int audio_get_last_record(const short *buffer_ptr[], int *buffer_index_pt
 extern void audio_free_last_record(int buffer_index);
 
 /**
- * Fetches the most recent buffer produced by FFT task using the CAB.
+ * Fetches the most recent FFT buffer produced by the microphone task using the
+ * CAB.
  * Returns its dimension or -EAGAIN if no data is available.
  */
 extern int audio_get_last_fft(const double *buffer_ptr[], int *buffer_index_ptr);
@@ -251,9 +252,6 @@ extern int audio_get_fft_rframes();
 
 /// The body of the microphone task
 extern void *microphone_task(void *arg);
-
-/// The body of the fft task
-extern void *fft_task(void *arg);
 
 /// The body of the analyzer task
 extern void *analysis_task(void *arg);

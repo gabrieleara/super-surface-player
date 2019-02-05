@@ -19,7 +19,6 @@
 #define MAX_DIRECTORY_LENGTH	(256)	///< Maximum length of a directory name
 
 #define LOG_VERBOSE				(0x01)	///< Verbose logging enabled
-#define LOG_WCET				(0x02)	///< WCET logging enabled
 
 // -----------------------------------------------------------------------------
 //                           RECORDING CONSTANTS
@@ -77,13 +76,13 @@
 /// Number of buffers used to record audio.
 /// It is given as the count of tasks that can read/write recorded audio samples
 /// plus one.
-/// Such tasks are the microphone task, the fft task and the gui task
-#define AUDIO_REC_NUM_BUFFERS		(4)
+/// Such tasks are the microphone task and the gui task
+#define AUDIO_REC_NUM_BUFFERS		(3)
 
 /// Number of buffers used to publish FFTs.
 /// It is given as the number of opened audio files (each potentially associated
-/// with a task), plus the FFT task, plus the gui task, plus one
-#define AUDIO_FFT_NUM_BUFFERS		(AUDIO_MAX_FILES+3)
+/// with a task), plus the gui task, plus one
+#define AUDIO_FFT_NUM_BUFFERS		(AUDIO_MAX_FILES+2)
 
 
 /// Converts a certain number of frames in milliseconds, given current
@@ -453,8 +452,7 @@
 #define TASK_GUI		(0)
 #define TASK_UI			(1)
 #define TASK_MIC		(2)
-#define TASK_FFT		(3)
-#define TASK_ALS_FIRST	(4)
+#define TASK_ALS_FIRST	(3)
 
 /// Maximum number of tasks which may be running at any time
 #define	TASK_NUM		(TASK_ALS_FIRST + AUDIO_MAX_FILES)
@@ -498,17 +496,10 @@
 #define TASK_MIC_DEADLINE 	(TASK_MIC_PERIOD)
 #define TASK_MIC_PRIORITY	(4)
 
-// FFT TASK
-
-#define TASK_FFT_WCET		(WCET_UNKNOWN)
-#define TASK_FFT_PERIOD		(AUDIO_DESIRED_PERIOD)
-#define TASK_FFT_DEADLINE	(TASK_FFT_PERIOD)
-#define TASK_FFT_PRIORITY	(4)
-
 // ANALYSIS TASK (which may me many)
 
 #define TASK_ALS_WCET		(WCET_UNKNOWN)
-#define TASK_ALS_PERIOD		(AUDIO_DESIRED_PERIOD)
+#define TASK_ALS_PERIOD		(AUDIO_DESIRED_PERIOD / 10)
 #define TASK_ALS_DEADLINE	(TASK_ALS_PERIOD)
 #define TASK_ALS_PRIORITY	(4)
 

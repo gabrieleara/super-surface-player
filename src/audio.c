@@ -437,6 +437,47 @@ static inline double correlation_normalized(const double *first_fft, const doubl
 }
 
 /**
+ * Computes and publishes the fft of the given audio_buffer, reserving a buffer
+ * from the CAB and performing the autocorrelation of the given audio sample.
+ */
+static inline void do_fft(const short *audio_buffer)
+{
+double*			fft_buffer;			// The buffer used to compute the FFT
+fft_output_t*	fft_pointer;		// The pointer to the structure in the CAB
+int				fft_pointer_index;	// The index of said structure in the CAB
+
+
+	// Get buffer on which operate
+	ptask_cab_reserve(&audio_state.fft.cab,
+		STATIC_CAST(void **, &fft_pointer),
+		&fft_pointer_index);
+
+	// Copy pointer to vector, just for convenience
+	fft_buffer = fft_pointer->fft;
+
+	// Copy data into new buffer
+	copy_buffer_with_padding(fft_buffer, audio_buffer);
+
+	// Calculate in-place FFT using the plan computed above on
+	// current buffer (potentially zero-padded)
+	fft(fft_buffer);
+
+	// NOTICE: Output of the FFT is an halfcomplex notation of the
+	// FFT, it should be changed to a full array of magniutes to be
+	// printed.
+
+	// Calculate at the same time the autocorrelation of the FFT
+	fft_pointer->autocorr = correlation_non_normalized(
+		fft_buffer,
+		fft_buffer
+	);
+
+	// Publish new FFT
+	ptask_cab_putmes(&audio_state.fft.cab, fft_pointer_index);
+}
+
+
+/**
  * Waits for a specified amount of ms.
  * If interrupted the wait is resumed with the remaining time, thus this
  * function always waits for the specified amount of ms.
@@ -1632,11 +1673,21 @@ int		missing;		// How many frames are missing
 				// the new data
 				ptask_cab_putmes(&audio_state.record.cab, buffer_index);
 
+				// Compute the FFT on the given data, it takes only a short
+				// amount of time and doing that in the same task reduces
+				// drastically the delay.
+
+				// NOTICE: Nobody can overwrite my audio buffer even after the
+				// release with the putmes, because this task is the only one
+				// doing the putmes on this cab.
+				do_fft(buffer);
+
 				// Get a local buffer from the CAB
 				// There is no check because it never fails if used correcly
 				ptask_cab_reserve(&audio_state.record.cab,
 								  STATIC_CAST(void**, &buffer),
 								  &buffer_index);
+
 				how_many_read	= 0;
 				missing			= audio_state.record.rframes;
 			}
@@ -1663,108 +1714,6 @@ int		missing;		// How many frames are missing
 	// for writing purposes is this one. If other threads are using buffers for
 	// reading purposes, eventually they will unget them.
 	ptask_cab_reset(&audio_state.record.cab);
-
-	return NULL;
-}
-
-/// The body of the fft task. Notice that only one instance at the time should
-/// be running.
-void *fft_task(void *arg)
-{
-ptask_t *tp; // task pointer
-// int task_id; // task identifier
-
-// Local variables
-int err;
-
-struct timespec last_timestamp = { .tv_sec = 0, .tv_nsec = 0};
-						// Timestamp of last accessed input buffer
-struct timespec new_timestamp;
-						// Timestamp of the new input buffer
-
-int in_buffer_index;	// Index of local buffer used to get microphone data
-const short *in_buffer;	// Pointer to local input buffer
-
-int out_buffer_index;	// Index of local buffer used to produce fft data
-double *out_buffer;		// Pointer to local output buffer
-
-fft_output_t *out_pointer;
-
-	tp = STATIC_CAST(ptask_t *, arg);
-	// task_id = ptask_get_id(tp);
-
-	// Variables initialization and initial computation
-
-	ptask_start_period(tp);
-
-	while (!main_get_tasks_terminate())
-	{
-		err = ptask_cab_getmes(&audio_state.record.cab,
-				STATIC_CAST(const void **, &in_buffer),
-				&in_buffer_index,
-				&new_timestamp);
-
-		// If the acquired buffer has not been analyzed yet
-		if (err != EAGAIN && time_cmp(last_timestamp, new_timestamp) < 0)
-		{
-			/*
-			// TODO: remove this check when done
-			struct timespec prova;
-			time_diff(&prova, new_timestamp, last_timestamp);
-
-			printf("TASK_FFT since last SAMPLE: %lld.%.9ld seconds.\r\n", (long long)prova.tv_sec, prova.tv_nsec);
-			*/
-
-			last_timestamp = new_timestamp;
-
-			// Get buffer on which operate
-			ptask_cab_reserve(&audio_state.fft.cab,
-				STATIC_CAST(void **, &out_pointer),
-				&out_buffer_index);
-
-			out_buffer = out_pointer->fft;
-
-			// Copy data into new buffer
-			copy_buffer_with_padding(out_buffer, in_buffer);
-
-			// NOTICE: To be quickier I should release the in_buffer as soon as
-			// I get here, but this could lead to some confusion because there
-			// would be two lines that may release the buffer, depending on a
-			// condition, I prefer releasing it after the analysis
-
-			// Calculate in-place FFT using the plan computed above on
-			// current buffer (potentially zero-padded)
-			fft(out_buffer);
-
-			out_pointer->autocorr = correlation_non_normalized(
-				out_buffer,
-				out_buffer
-			);
-
-			// NOTICE: Output of previous FFT is an halfcomplex notation of the
-			// FFT, it should be changed to a full array of magniutes to be
-			// printed.
-
-			// Publish new FFT
-			ptask_cab_putmes(&audio_state.fft.cab, out_buffer_index);
-		}
-		// Otherwise, do nothing
-
-		// Realease acquired buffer (if acquired)
-		if (err == 0)
-			ptask_cab_unget(&audio_state.record.cab, in_buffer_index);
-
-		if (ptask_deadline_miss(tp))
-			printf("TASK_FFT missed %d deadlines!\r\n", ptask_get_dmiss(tp));
-
-		ptask_wait_for_period(tp);
-	}
-
-	// Cleanup
-
-	// The reset can be done here because the only task that reserves buffers
-	// for writing purposes is this one
-	ptask_cab_reset(&audio_state.fft.cab);
 
 	return NULL;
 }
@@ -1831,6 +1780,19 @@ int err;
 				// decay of the trigger because the time window is not exactly
 				// too small
 				audio_file_play(file_index);
+				/*
+				struct timespec the_delay;
+				struct timespec now;
+
+				clock_gettime(CLOCK_MONOTONIC, &now);
+
+				time_diff(&the_delay, now, new_timestamp);
+
+				printf("TASK_ALS delay since FFT publication on audio recognition: "
+					"%lld.%.9ld seconds.\r\n",
+					(long long)the_delay.tv_sec,
+					the_delay.tv_nsec);
+				*/
 			}
 		}
 
