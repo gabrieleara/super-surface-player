@@ -491,7 +491,8 @@ int s = 0;
 	if (ms < 1)
 		return;
 
-	if (ms >= 1000) {
+	if (ms >= 1000)
+	{
 		s = ms / 1000;
 		ms = ms % 1000;
 	}
@@ -1297,19 +1298,23 @@ int i;
 
 // -------------- GETTERS --------------
 
-int audio_get_record_rrate() {
+int audio_get_record_rrate()
+{
 	return audio_state.record.rrate;
 }
 
-int audio_get_record_rframes() {
+int audio_get_record_rframes()
+{
 	return audio_state.record.rframes;
 }
 
-int audio_get_fft_rrate() {
+int audio_get_fft_rrate()
+{
 	return audio_state.fft.rrate;
 }
 
-int audio_get_fft_rframes() {
+int audio_get_fft_rframes()
+{
 	return audio_state.fft.rframes;
 }
 
@@ -1787,7 +1792,8 @@ int err;
 				"TASK_ALS correlation with file %d is %f .\r\n",
 				file_index+1, correlation);
 
-			if (fabs(correlation) > AUDIO_THRESHOLD) {
+			if (fabs(correlation) > AUDIO_THRESHOLD)
+			{
 				// We start every time a new execution, there is no need for a
 				// decay of the trigger because the time window is not exactly
 				// too small

@@ -630,7 +630,8 @@ int num, i;
 /**
  * Converts a value of FFT energy into the height of its plot in pixels.
  */
-int fft_average_to_height(double average) {
+int fft_average_to_height(double average)
+{
 int num_pixels;
 
 	num_pixels = average / FFT_PLOT_SCALING;
@@ -693,7 +694,8 @@ int i;
 	last_index	= 0;
 
 	// For each pixel of the plot
-	for (pixel_offset = 0; pixel_offset < FFT_PLOT_WIDTH; ++pixel_offset) {
+	for (pixel_offset = 0; pixel_offset < FFT_PLOT_WIDTH; ++pixel_offset)
+	{
 		window_end		+= frame_window_per_pixel;
 
 		first_weight	= 1. - last_weight;
@@ -704,7 +706,8 @@ int i;
 
 		// Each value is summed considering its weight
 		average = first_weight * amplitudes[first_index];
-		for (i = first_index+1; i < last_index; ++i) {
+		for (i = first_index+1; i < last_index; ++i)
+		{
 			// Weight is one on the interior of the window
 			average += amplitudes[i];
 		}
@@ -758,7 +761,8 @@ int i;
 	// Translating from half-complex notation of the fft to magnitudes only.
 	// To the real value of index i (one-based), the corresponding complex value
 	// is the N-ith value, where N is the total length of the fft array
-	for (i = 1; i <= number_frames; ++i) {
+	for (i = 1; i <= number_frames; ++i)
+	{
 		amplitudes[i-1] = sqrt(
 			buffer[i] * buffer[i] +
 			buffer[rframes-i] * buffer[rframes-i]
@@ -1288,7 +1292,8 @@ int err;
 // -----------------------------------------------------------------------------
 
 
-void* gui_task(void* arg) {
+void* gui_task(void* arg)
+{
 ptask_t*	tp;			// task pointer
 // int			task_id;	// task identifier
 
@@ -1326,7 +1331,8 @@ int err;
 
 
 
-void* user_interaction_task(void* arg) {
+void* user_interaction_task(void* arg)
+{
 ptask_t*	tp;			// task pointer
 // int			task_id;	// task identifier
 

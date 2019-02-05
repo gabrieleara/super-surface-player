@@ -33,7 +33,8 @@
 // Structure of a task, its argument is the pointer to the previously defined
 // descriptor structure
 
-void* task_body(void* arg) {
+void* task_body(void* arg)
+{
 // <local state variables>
 	ptask_t* tp;
 	int task_id;
