@@ -48,6 +48,21 @@
 /// NOTICE: the bigger this number, the bigger the latency.
 #define AUDIO_DESIRED_FRAMES	(8*1024)
 
+/// Increase this value to try to decrease the latency of the system, at the
+/// cost of additional task wakeups.
+/// ALSA publishes data with a period that can be manually configured in terms
+/// of number of frames. If set to one, the configured period will be set equal
+/// to AUDIO_DESIRED_FRAMES, which is the window used to analyze data.
+/// If set to a bigger value (use only powers of two, since AUDIO_DESIRED_FRAMES
+/// is a power of two), the period used for ALSA audio capture will be a
+/// fraction of the default period. This requires the tasks that interact with
+/// microphone data to be executed more frequently to capture published data,
+/// but it will also reduce greatly the delay between the acquisition of the
+/// audio and the reception of that same audio by the program, increasing its
+/// responsiveness.
+/// Tested correctly with the following values: 1, 2, 4, 8, 16
+#define AUDIO_LATENCY_REDUCER	(8)
+
 /// Adds padding to the specified number if the zero padding is enabled,
 /// otherwise does nothing.
 #define AUDIO_ADD_PADDING(frames)	(frames * ((AUDIO_ZERO_PADDING) ? 2 : 1))
@@ -96,7 +111,7 @@
 /// 185.7596371882086 milliseconds, but the actutal period is truncated to
 /// 185 ms).
 #define AUDIO_DESIRED_PERIOD \
-	FRAMES_TO_MS(AUDIO_DESIRED_FRAMES,AUDIO_DESIRED_RATE)
+	FRAMES_TO_MS(AUDIO_DESIRED_FRAMES/AUDIO_LATENCY_REDUCER, AUDIO_DESIRED_RATE)
 
 // -----------------------------------------------------------------------------
 //                           GRAPHIC CONSTANTS
@@ -495,13 +510,13 @@
 
 #define TASK_MIC_WCET		(WCET_UNKNOWN)
 #define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD)
-#define TASK_MIC_DEADLINE 	(TASK_MIC_PERIOD)
+#define TASK_MIC_DEADLINE	(TASK_MIC_PERIOD)
 #define TASK_MIC_PRIORITY	(4)
 
 // ANALYSIS TASK (which may me many)
 
 #define TASK_ALS_WCET		(WCET_UNKNOWN)
-#define TASK_ALS_PERIOD		(AUDIO_DESIRED_PERIOD / 10)
+#define TASK_ALS_PERIOD		(AUDIO_DESIRED_PERIOD)
 #define TASK_ALS_DEADLINE	(TASK_ALS_PERIOD)
 #define TASK_ALS_PRIORITY	(4)
 

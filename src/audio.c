@@ -631,6 +631,11 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	}
 
 	// Setting execution period size based on number of frames of the buffer
+	// The actual number of frames for audio capture is reduced using a certain
+	// factor. See AUDIO_LATENCY_REDUCER documentation for further details.
+	if (stream_direction == SND_PCM_STREAM_CAPTURE)
+		rframes = rframes / AUDIO_LATENCY_REDUCER;
+
 	// After this call, rframes will contain the actual period accepted by the
 	// device
 	err = snd_pcm_hw_params_set_period_size_near(alsa_handle, hw_params,
@@ -640,6 +645,10 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 		print_log(LOG_VERBOSE, "Failed to set period on ALSA PCM.\r\n");
 		return err;
 	}
+
+	// See AUDIO_LATENCY_REDUCER documentation for further details.
+	if (stream_direction == SND_PCM_STREAM_CAPTURE)
+		rframes = rframes * AUDIO_LATENCY_REDUCER;
 
 	// Writing parameters to the driver
 	err = snd_pcm_hw_params(alsa_handle, hw_params);
@@ -1663,7 +1672,8 @@ int		missing;		// How many frames are missing
 		// While there is new data, keep capturing.
 		// NOTICE: This is NOT an infinite loop, because the code is many times
 		// faster than I/O.
-		while ((err = mic_read(buffer + how_many_read, missing)) > 0) {
+		while ((err = mic_read(buffer + how_many_read, missing)) > 0)
+		{
 			how_many_read	+= err;
 			missing			-= err;
 
