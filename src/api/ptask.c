@@ -350,7 +350,8 @@ struct timespec now;
 
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	if (time_cmp(now, ptask->dl) > 0) {
+	if (time_cmp(now, ptask->dl) > 0)
+	{
 		ptask->dmiss++;
 		return 1;
 	}
