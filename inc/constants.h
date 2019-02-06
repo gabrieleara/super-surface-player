@@ -12,36 +12,34 @@
 #define CONSTANTS_H
 
 // -----------------------------------------------------------------------------
-//                         GLOBAL SHARED CONSTANTS
-// -----------------------------------------------------------------------------
-
-#define MAX_CHAR_BUFFER_SIZE	(256)	///< Size of any char buffer used in the system
-#define MAX_DIRECTORY_LENGTH	(256)	///< Maximum length of a directory name
-
-#define LOG_VERBOSE				(0x01)	///< Verbose logging enabled
-
-// -----------------------------------------------------------------------------
-//                           RECORDING CONSTANTS
+//                       CONFIGURABLE SHARED CONSTANTS
 // -----------------------------------------------------------------------------
 
 /**
- * @name Recording-related constants
+ * @name Configurable shared properties
  */
 //@{
 
-#define AUDIO_MAX_FILES			(8)		///< The maximum number of opened audio files
+// Constants in this section can be changed to modify the behavior of the
+// program in a non-destructive way
 
 #define AUDIO_DESIRED_RATE		(44100)	///< Desired acquisition rate (Hz)
 
-#define AUDIO_ZERO_PADDING		(1)
+#define AUDIO_ENABLE_PADDING	(1)
 										///< 0 means no zero-padding, 1 means
-										///< padding will be used and it will
-										///< be a dimension equal to the number
-										///< of frames.
+										///< padding will be used and its size
+										///< will depend on AUDIO_PADDING_RATIO
+										///< constant value
+
+#define AUDIO_PADDING_RATIO		(2)
+										///< The ratio between the number of
+										///< frames captured and the number of
+										///< frames after padding is added
+										///< (if enabled)
 
 /// The treshold that is used to check whether the recorded audio corresponds to
 /// a given audio sample
-#define AUDIO_THRESHOLD			(0.3) // 0.35
+#define AUDIO_THRESHOLD			(0.3)
 
 /// Desired number of frames contained in an audio sample.
 /// It should be a power of two to make the FFT computation way faster.
@@ -61,11 +59,49 @@
 /// audio and the reception of that same audio by the program, increasing its
 /// responsiveness.
 /// Tested correctly with the following values: 1, 2, 4, 8, 16
+/// NOTICE: if AUDIO_APERIODIC is enabled, one of the tasks will become aperiodic,
+/// but the tasks that analyze the FFTs can still be enhanced using this
+/// constant.
 #define AUDIO_LATENCY_REDUCER	(8)
+
+/// The amplitude which corresponds to the maximum height
+#define TIME_MAX_AMPLITUDE	(1000000000/2)
+
+/// The scaling of the FFT plot with respect to the computed energy value
+#define FFT_PLOT_SCALING			(5.)
+
+/// Uncomment this line to make the microphone task an aperiodic task, waking
+/// it up using another faster task
+// #define AUDIO_APERIODIC
+
+
+//@}
+
+
+// -----------------------------------------------------------------------------
+//                         GLOBAL SHARED CONSTANTS
+// -----------------------------------------------------------------------------
+
+#define MAX_CHAR_BUFFER_SIZE	(256)	///< Size of any char buffer used in the system
+#define MAX_DIRECTORY_LENGTH	(256)	///< Maximum length of a directory name
+
+#define LOG_VERBOSE				(0x01)	///< Verbose logging enabled
+
+// -----------------------------------------------------------------------------
+//                           RECORDING CONSTANTS
+// -----------------------------------------------------------------------------
+
+/**
+ * @name Recording-related constants
+ */
+//@{
+
+#define AUDIO_MAX_FILES			(8)		///< The maximum number of opened audio files
 
 /// Adds padding to the specified number if the zero padding is enabled,
 /// otherwise does nothing.
-#define AUDIO_ADD_PADDING(frames)	(frames * ((AUDIO_ZERO_PADDING) ? 2 : 1))
+#define AUDIO_ADD_PADDING(frames)	\
+	(frames * ((AUDIO_ENABLE_PADDING) ? AUDIO_PADDING_RATIO : 1))
 
 /// Converts the number of acquired frames to the number of values of
 /// the corresponding magnitude-only half-complex FFT.
@@ -105,11 +141,8 @@
 #define FRAMES_TO_MS(frames,rate) \
 	((1000L * STATIC_CAST(long,frames)) / STATIC_CAST(long,rate))
 
-/// The desired period of the audio acquisition task
-/// The current configuration leads to a window about 0.186 seconds wide when
-/// recording data (more precisely, an expected time window is
-/// 185.7596371882086 milliseconds, but the actutal period is truncated to
-/// 185 ms).
+/// The desired period of the audio acquisition task.
+/// NOTICE that the actual period is truncated to the millisecond of course.
 #define AUDIO_DESIRED_PERIOD \
 	FRAMES_TO_MS(AUDIO_DESIRED_FRAMES/AUDIO_LATENCY_REDUCER, AUDIO_DESIRED_RATE)
 
@@ -213,26 +246,27 @@
  */
 //@{
 
-#define SIDE_X		(WIN_MX * 7/10)		///< Side panel position x
-#define SIDE_Y		(0)					///< Side panel position y
-#define SIDE_MX		(WIN_MX)			///< Side panel max x
-#define SIDE_MY		(FOOTER_Y)			///< Side panel max y
+#define SIDE_X				(WIN_MX * 7/10)		///< Side panel position x
+#define SIDE_Y				(0)					///< Side panel position y
+#define SIDE_MX				(WIN_MX)			///< Side panel max x
+#define SIDE_MY				(FOOTER_Y)			///< Side panel max y
 
-#define SIDE_WIDTH	(SIDE_MX-SIDE_X)	///< Side panel width
-#define SIDE_HEIGHT	(SIDE_MY-SIDE_Y)	///< Side panel height
+#define SIDE_WIDTH			(SIDE_MX-SIDE_X)	///< Side panel width
+#define SIDE_HEIGHT			(SIDE_MY-SIDE_Y)	///< Side panel height
 
-#define SIDE_NUM_ELEMENTS	(8)
-										///< The maximum number of elements in
-										///< the side panel
+#define SIDE_NUM_ELEMENTS	(AUDIO_MAX_FILES)
+												///< The maximum number of
+												///< elements in the side panel
 
-#define SIDE_ELEM_X	(SIDE_X)				///< Side panel element position x
+#define SIDE_ELEM_X			(SIDE_X)		///< Side panel element position x
 
 #define SIDE_ELEM_WIDTH		(SIDE_WIDTH)	///< Side panel element width
 #define SIDE_ELEM_HEIGHT	(SIDE_HEIGHT/SIDE_NUM_ELEMENTS)
 											///< Side panel element height
 
-#define SIDE_ELEM_MX	(SIDE_MX-SIDE_X)	///< Side panel element max x
-#define SIDE_ELEM_MY	(SIDE_ELEM_X + SIDE_ELEM_HEIGHT)
+#define SIDE_ELEM_MX		(SIDE_MX-SIDE_X)
+											///< Side panel element max x
+#define SIDE_ELEM_MY		(SIDE_ELEM_X + SIDE_ELEM_HEIGHT)
 											///< Side panel element max y
 
 #define SIDE_ELEM_NAME_X	(SIDE_ELEM_X + 12)
@@ -367,9 +401,6 @@
 /// FFT panel Y scale position x
 #define FFT_PLOT_Y_SCALE_X			(FFT_PLOT_Y_SCALE_MX - 5)
 
-/// The scaling of the FFT plot with respect to the computed energy value
-#define FFT_PLOT_SCALING			(5.)
-
 /*
 	 __________________________________________________________
 	|                                           |              |
@@ -428,8 +459,6 @@
 
 /// The maximum height of the time plot content
 #define TIME_MAX_HEIGHT		(TIME_PLOT_HEIGHT/2)
-/// The amplitude which corresponds to the maximum height
-#define TIME_MAX_AMPLITUDE	(1000000000/2)
 
 #define TIME_PLOT_X_TICKS	(10)	///< Number of ticks on the TIME plot X scale
 #define TIME_PLOT_Y_TICKS	(4)		///< Number of ticks on the TIME plot Y scale
@@ -465,9 +494,10 @@
  */
 //@{
 
-// The tasks are: gui, user interaction, microphone, fft and analysis.
+// The tasks are: gui, user interaction, microphone, checkdata and analysis.
 #define TASK_GUI		(0)
 #define TASK_UI			(1)
+#define TASK_CHK		(2)
 #define TASK_MIC		(2)
 #define TASK_ALS_FIRST	(3)
 
@@ -506,19 +536,28 @@
 #define TASK_UI_DEADLINE	(10)
 #define TASK_UI_PRIORITY	(2)
 
+// CHECK DATA TASK (this is used only if AUDIO_APERIODIC is defined)
+
+#define TASK_CHK_WCET		(WCET_UNKNOWN)
+#define TASK_CHK_PERIOD		(1)
+#define TASK_CHK_DEADLINE	(TASK_CHK_PERIOD)
+#define TASK_CHK_PRIORITY	(4)
+
 // MICROPHONE TASK
 
+// NOTICE: if AUDIO_APERIODIC is defined, then the period of the microphone task
+// doesn't matter because it is governed by the chekdata task
 #define TASK_MIC_WCET		(WCET_UNKNOWN)
 #define TASK_MIC_PERIOD		(AUDIO_DESIRED_PERIOD)
 #define TASK_MIC_DEADLINE	(TASK_MIC_PERIOD)
-#define TASK_MIC_PRIORITY	(4)
+#define TASK_MIC_PRIORITY	(3)
 
 // ANALYSIS TASK (which may me many)
 
 #define TASK_ALS_WCET		(WCET_UNKNOWN)
 #define TASK_ALS_PERIOD		(AUDIO_DESIRED_PERIOD)
 #define TASK_ALS_DEADLINE	(TASK_ALS_PERIOD)
-#define TASK_ALS_PRIORITY	(4)
+#define TASK_ALS_PRIORITY	(3)
 
 //@}
 

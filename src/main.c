@@ -747,6 +747,26 @@ static inline int start_ui_task()
 			0);
 }
 
+#ifdef AUDIO_APERIODIC
+/**
+ * Initializes and starts the task that checks how many frames are available,
+ * returning zero on success.
+ */
+static inline int start_checkdata_task()
+{
+	return
+		ptask_short(
+			&main_state.tasks[TASK_CHK],
+			TASK_CHK_WCET,
+			TASK_CHK_PERIOD,
+			TASK_CHK_DEADLINE,
+			GET_PRIO(TASK_CHK_PRIORITY),
+			checkdata_task,
+			NULL,
+			0);
+}
+#endif
+
 /**
  * Initializes and starts the recording task, returning zero on success.
  */
@@ -762,7 +782,6 @@ static inline int start_microphone_task()
 			microphone_task,
 			NULL,
 			0);
-	//return 0;
 }
 
 /**
@@ -824,6 +843,11 @@ int err;
 	err = start_ui_task();
 	if (err) return err;
 
+#ifdef AUDIO_APERIODIC
+	err = start_checkdata_task();
+	if (err) return err;
+#endif
+
 	err = start_microphone_task();
 	if (err) return err;
 
@@ -839,6 +863,10 @@ static inline void join_tasks()
 	ptask_join(&main_state.tasks[TASK_UI]);
 	ptask_join(&main_state.tasks[TASK_GUI]);
 	ptask_join(&main_state.tasks[TASK_MIC]);
+
+#ifdef AUDIO_APERIODIC
+	ptask_join(&main_state.tasks[TASK_CHK]);
+#endif
 
 	int num_recording_files = 0;
 	int i;
@@ -951,6 +979,12 @@ int err;
 	print_log(LOG_VERBOSE,
 		"The desired period for audio tasks is %ld ms.\r\n",
 		AUDIO_DESIRED_PERIOD);
+
+#ifdef AUDIO_APERIODIC
+	print_log(LOG_VERBOSE, "This is the APERIDIC version of the acquisition task.\r\n");
+#else
+	print_log(LOG_VERBOSE, "This is the timer-based version of the acquisition task.\r\n");
+#endif
 
 	while (!main_state.quit)
 	{

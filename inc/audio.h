@@ -250,6 +250,9 @@ extern int audio_get_fft_rframes();
  */
 //@{
 
+/// The body of the checkdata task
+extern void* checkdata_task(void *arg);
+
 /// The body of the microphone task
 extern void *microphone_task(void *arg);
 

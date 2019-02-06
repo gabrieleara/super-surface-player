@@ -127,6 +127,17 @@ typedef struct __AUDIO_RECORD_STRUCT
 	snd_pcm_t *playback_handle;	///< ALSA Hardware Handle used to playback
 								///< recorded audio
 
+#ifdef AUDIO_APERIODIC
+	snd_pcm_uframes_t avail;	///< The number of available frames to be read
+								///< in the capture buffer
+
+	ptask_mutex_t availability_mutex;	///< Mutex that protects access to avail
+										///< attribute
+	ptask_cond_t availability_cond;		///< Condition variable that signals
+										///< when the avail variable is over
+										///< the threshold (rframes)
+#endif
+
 	short buffers[AUDIO_REC_NUM_BUFFERS][AUDIO_DESIRED_BUFFER_SIZE];
 								///< Buffers used within the cab
 
@@ -448,7 +459,6 @@ double*			fft_buffer;			// The buffer used to compute the FFT
 fft_output_t*	fft_pointer;		// The pointer to the structure in the CAB
 int				fft_pointer_index;	// The index of said structure in the CAB
 
-
 	// Get buffer on which operate
 	ptask_cab_reserve(&audio_state.fft.cab,
 		STATIC_CAST(void **, &fft_pointer),
@@ -569,7 +579,7 @@ snd_pcm_uframes_t rframes = *rframes_ptr;
 snd_pcm_t *alsa_handle;			// ALSA Hardware Handle used to record audio
 snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 
-	// Open PCM device for recording (capture)
+	// Open PCM device
 	err = snd_pcm_open(&alsa_handle, "default", stream_direction, mode);
 	if (err < 0)
 	{
@@ -634,8 +644,10 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	// Setting execution period size based on number of frames of the buffer
 	// The actual number of frames for audio capture is reduced using a certain
 	// factor. See AUDIO_LATENCY_REDUCER documentation for further details.
+#ifndef AUDIO_APERIODIC
 	if (stream_direction == SND_PCM_STREAM_CAPTURE)
 		rframes = rframes / AUDIO_LATENCY_REDUCER;
+#endif
 
 	// After this call, rframes will contain the actual period accepted by the
 	// device
@@ -648,8 +660,10 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 	}
 
 	// See AUDIO_LATENCY_REDUCER documentation for further details.
+#ifndef AUDIO_APERIODIC
 	if (stream_direction == SND_PCM_STREAM_CAPTURE)
 		rframes = rframes * AUDIO_LATENCY_REDUCER;
+#endif
 
 	// Writing parameters to the driver
 	err = snd_pcm_hw_params(alsa_handle, hw_params);
@@ -998,6 +1012,65 @@ static inline int mic_stop()
 	return snd_pcm_drop(audio_state.record.record_handle);
 }
 
+#ifdef AUDIO_APERIODIC
+
+/**
+ * Updates the counter of the number of available frames to be read from
+ * capture buffer.
+ */
+static inline void mic_update_avail()
+{
+snd_pcm_sframes_t avail;// The number of available frames to be read in the
+						// capture buffer
+
+	avail = snd_pcm_avail_update(audio_state.record.record_handle);
+
+	if (avail < 0)
+		avail = 0;
+
+	ptask_mutex_lock(&audio_state.record.availability_mutex);
+
+	audio_state.record.avail = avail;
+	if (audio_state.record.avail >= audio_state.record.rframes)
+		ptask_cond_signal(&audio_state.record.availability_cond);
+
+	ptask_mutex_unlock(&audio_state.record.availability_mutex);
+}
+
+/**
+ * Waits for the counter of available frames to be over the global threshold.
+ */
+static inline void mic_wait_for_avail()
+{
+	ptask_mutex_lock(&audio_state.record.availability_mutex);
+
+	// If the task should terminate, a signal will be sent by the other task
+	while(audio_state.record.avail < audio_state.record.rframes &&
+		!main_get_tasks_terminate())
+	{
+		ptask_cond_wait(&audio_state.record.availability_cond,
+			&audio_state.record.availability_mutex);
+	}
+
+	ptask_mutex_unlock(&audio_state.record.availability_mutex);
+}
+
+/**
+ * Signals any waiting task within mic_wait_for_avail() that it should stop
+ * waiting because the terminate tasks condition has been set.
+ */
+static inline void mic_stop_waiting()
+{
+	ptask_mutex_lock(&audio_state.record.availability_mutex);
+
+	audio_state.record.avail = 0;
+	ptask_cond_signal(&audio_state.record.availability_cond);
+
+	ptask_mutex_unlock(&audio_state.record.availability_mutex);
+}
+
+#endif
+
 /**
  * Prepares the alsa playback handle to play a recorded sample.
  * Returns 0 on success, less than zero on error.
@@ -1109,9 +1182,17 @@ fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
 
 fftw_plan fft_plan_inverse;		// The FFTW3 plan used to compute the inverse FFT
 
-	// Mutex initialization
+	// Mutexes and condition variables initialization
 	err = ptask_mutex_init(&audio_state.mutex);
 	if (err) return err;
+
+#ifdef AUDIO_APERIODIC
+	err = ptask_mutex_init(&audio_state.record.availability_mutex);
+	if (err) return err;
+
+	err = ptask_cond_init(&audio_state.record.availability_cond);
+	if (err) return err;
+#endif
 
 	// Allegro and ALSA initialization
 	err = install_allegro_alsa_sound(&rrate, &rframes, &record_handle, &playback_handle);
@@ -1636,6 +1717,130 @@ void audio_file_discard_recorded_sample(int i)
 //                                  TASKS
 // -----------------------------------------------------------------------------
 
+
+#ifdef AUDIO_APERIODIC
+
+/// The body of the check data task
+void* checkdata_task(void *arg)
+{
+ptask_t*	tp;			// task pointer
+// int			task_id;	// task identifier
+
+	tp = STATIC_CAST(ptask_t *, arg);
+	// task_id = ptask_get_id(tp);
+
+	// Variables initialization and initial computation
+
+	ptask_start_period(tp);
+
+	while (!main_get_tasks_terminate())
+	{
+
+		mic_update_avail();
+
+		if (ptask_deadline_miss(tp))
+			printf("TASK_CHK missed %d deadlines!\r\n", ptask_get_dmiss(tp));
+
+		ptask_wait_for_period(tp);
+	}
+
+	mic_stop_waiting();
+
+	return NULL;
+}
+
+/// The body of the microphone task
+void* microphone_task(void *arg)
+{
+ptask_t*	tp;			// task pointer
+// int			task_id;	// task identifier
+
+// Local variables
+int		err;
+
+int 	buffer_index;	// Index of local buffer used to get microphone data
+						// used to access cab
+short	*buffer;		// Pointer to local buffer, changes each time the buffer
+						// is full
+
+	tp = STATIC_CAST(ptask_t *, arg);
+	// task_id = ptask_get_id(tp);
+
+	// Variables initialization and initial computation
+
+	// Preparing the microphone interface to be used
+	err = mic_prepare();
+	if (err)
+		abort_on_error("Could not prepare microphone acquisition.");
+
+	ptask_start_period(tp);
+
+	// Get a local buffer from the CAB
+	// There is no check because it never fails if used correcly
+	ptask_cab_reserve(&audio_state.record.cab,
+					  STATIC_CAST(void *, &buffer),
+					  &buffer_index);
+
+	while (!main_get_tasks_terminate())
+	{
+		err = mic_read(buffer, audio_state.record.rframes);
+
+		// Throw away unsufficient data, can only happen on first iteration and
+		// in all of the tests there was no data to be read at all at first
+		// iteration
+		if (err > 0 &&
+			STATIC_CAST(unsigned int, err) == audio_state.record.rframes )
+		{
+			// Update most recent acquisition and request a new CAB
+
+			// Release CAB to apply changes, a timestamp will be added to
+			// the new data
+			ptask_cab_putmes(&audio_state.record.cab, buffer_index);
+
+			// Compute the FFT on the given data, it takes only a short
+			// amount of time and doing that in the same task reduces
+			// drastically the delay.
+
+			// NOTICE: Nobody can overwrite my audio buffer even after the
+			// release with the putmes, because this task is the only one
+			// doing the putmes on this cab.
+			do_fft(buffer);
+
+			// Get a local buffer from the CAB
+			// There is no check because it never fails if used correcly
+			ptask_cab_reserve(&audio_state.record.cab,
+								STATIC_CAST(void**, &buffer),
+								&buffer_index);
+		}
+
+		// Since we removed data from the buffer, better update data count by
+		// ourselves, without waiting for the checkdata task this time
+		mic_update_avail();
+
+		// Wait for next activation by the checkdata task
+		mic_wait_for_avail();
+	}
+
+	// Cleanup
+	// Stop recording
+	err = mic_stop();
+	if (err)
+		abort_on_error("Could not stop properly the microphone acquisition.");
+
+	// Releasing unused half-empty buffer, this is needed because the reset does
+	// not release any buffer that was previously reserved
+	ptask_cab_unget(&audio_state.record.cab, buffer_index);
+
+	// The reset can be done here because the only task that reserves buffers
+	// for writing purposes is this one. If other threads are using buffers for
+	// reading purposes, eventually they will unget them.
+	ptask_cab_reset(&audio_state.record.cab);
+
+	return NULL;
+}
+
+#else
+
 /// The body of the microphone task
 void* microphone_task(void *arg)
 {
@@ -1734,6 +1939,8 @@ int		missing;		// How many frames are missing
 
 	return NULL;
 }
+
+#endif
 
 /// The body of the analyzer task
 void *analysis_task(void *arg)
