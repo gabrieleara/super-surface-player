@@ -5,8 +5,14 @@
  * @author Gabriele Ara
  * @date 2019/01/17
  *
- * For public functions, documentation can be found in corresponding header file:
- * audio.h.
+ * This module handles all interactions between the program and audio services
+ * provided either by Allegro or directly via the ALSA library, both for
+ * recording and playback purposes.
+ * It also uses FFTW library to compute FFT/IFFT of the acquired audio samples
+ * and publishes results on CAB structures that can be accessed via getters.
+ *
+ * For public functions, documentation can be found in corresponding header
+ * file: audio.h.
  *
  * Except the ones that shall be called from a single-thread environment,
  * functions are safe from a concurrency point of view.
@@ -72,9 +78,9 @@
 /// Pointer to the opened file type
 typedef union __AUDIO_POINTER_UNION
 {
-	SAMPLE* audio_p;		///< Pointer to the audio SAMPLE structure
-	MIDI*	midi_p;			///< Pointer to the MIDI structure
-	void*	gen_p;			///< Fallback generic pointer
+	SAMPLE* audio_p;			///< Pointer to the audio SAMPLE structure
+	MIDI*	midi_p;				///< Pointer to the MIDI structure
+	void*	gen_p;				///< Fallback generic pointer
 } audio_pointer_t;
 
 
@@ -93,23 +99,24 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 	// I decided to not enable loop execution of audio files.
 	// bool loop;				///< Tells if the audio should be reproduced in a loop
 
-	bool has_rec;				///< Tells if the file has an associated
+	bool 			has_rec;	///< Tells if the file has an associated
 								///< recorded audio that can be recognized to
 								///< start it playing
 
-	char filename[MAX_AUDIO_NAME_LENGTH];
+	char 			filename[MAX_AUDIO_NAME_LENGTH];
 								///< Name of the file displayed on the screen,
 								///< contains only the basename, ellipsed if
 								///< too long
 
-	double autocorr;			///< The cross correlation of the signal with itself
+	double 			autocorr;	///< The cross correlation of the signal with
+								///< itself
 
-	short recorded_sample[AUDIO_DESIRED_BUFFER_SIZE];
+	short			recorded_sample[AUDIO_DESIRED_BUFFER_SIZE];
 								///< Contains the recorded sample by the user
 								///< to play the audio file whenever a sample
 								///< similar to the recorded one is detected
 
-	double recorded_fft[AUDIO_DESIRED_PADBUFFER_SIZE];
+	double			recorded_fft[AUDIO_DESIRED_PADBUFFER_SIZE];
 								///< Contains the FFT of the recorded sample,
 								///< precomputed for efficiency reasons
 } audio_file_desc_t;
@@ -117,31 +124,35 @@ typedef struct __AUDIO_FILE_DESC_STRUCT
 /// Status of the resources used to record audio
 typedef struct __AUDIO_RECORD_STRUCT
 {
-	unsigned int rrate;			///< Recording acquisition ratio, as accepted
+	unsigned int		rrate;	///< Recording acquisition ratio, as accepted
 								///< by the device
 
-	snd_pcm_uframes_t rframes;	///< Period requested to recorder task,
+	snd_pcm_uframes_t	rframes;///< Period requested to recorder task,
 								///< expressed in terms of number of frames
 
-	snd_pcm_t *record_handle;	///< ALSA Hardware Handle used to record audio
-	snd_pcm_t *playback_handle;	///< ALSA Hardware Handle used to playback
+	snd_pcm_t*			record_handle;
+								///< ALSA Hardware Handle used to record audio
+	snd_pcm_t*			playback_handle;
+								///< ALSA Hardware Handle used to playback
 								///< recorded audio
 
 #ifdef AUDIO_APERIODIC
-	snd_pcm_uframes_t avail;	///< The number of available frames to be read
+	snd_pcm_uframes_t	avail;	///< The number of available frames to be read
 								///< in the capture buffer
 
-	ptask_mutex_t availability_mutex;	///< Mutex that protects access to avail
-										///< attribute
-	ptask_cond_t availability_cond;		///< Condition variable that signals
-										///< when the avail variable is over
-										///< the threshold (rframes)
+	ptask_mutex_t		availability_mutex;
+								///< Mutex that protects access to avail
+								///< attribute
+	ptask_cond_t		availability_cond;
+								///< Condition variable that signals when the
+								///< avail variable is over the threshold
+								///< (rframes)
 #endif
 
-	short buffers[AUDIO_REC_NUM_BUFFERS][AUDIO_DESIRED_BUFFER_SIZE];
+	short	buffers[AUDIO_REC_NUM_BUFFERS][AUDIO_DESIRED_BUFFER_SIZE];
 								///< Buffers used within the cab
 
-	ptask_cab_t cab;			///< CAB used to handle allocated buffers
+	ptask_cab_t			cab;	///< CAB used to handle allocated buffers
 } audio_record_t;
 
 /**
@@ -150,8 +161,8 @@ typedef struct __AUDIO_RECORD_STRUCT
  */
 typedef struct __FFT_OUTPUT
 {
-	double autocorr;			///< The autocorrelation of the given sample
-	double fft[AUDIO_DESIRED_PADBUFFER_SIZE];
+	double	autocorr;			///< The autocorrelation of the given sample
+	double	fft[AUDIO_DESIRED_PADBUFFER_SIZE];
 								///< The FFT of the given sample, its format is
 								///< Halfcomplex-formatted FFT
 } fft_output_t;
@@ -159,19 +170,20 @@ typedef struct __FFT_OUTPUT
 /// Status of the resources used to perform fft
 typedef struct __AUDIO_FFT_STRUCT
 {
-	unsigned int rrate;			///< Recording acquisition ratio, as accepted
+	unsigned int		rrate;	///< Recording acquisition ratio, as accepted
 								///< by the device
 
-	snd_pcm_uframes_t rframes;	///< Period requested to recorder task,
+	snd_pcm_uframes_t	rframes;///< Period requested to recorder task,
 								///< expressed in terms of number of frames
 
-	fftw_plan plan;				///< The plan used to perform the FFT
-	fftw_plan plan_inverse;		///< The plan used to perform the inverse FFT
+	fftw_plan			plan;	///< The plan used to perform the FFT
+	fftw_plan			plan_inverse;
+								///< The plan used to perform the inverse FFT
 
-	fft_output_t buffers[AUDIO_FFT_NUM_BUFFERS];
+	fft_output_t		buffers[AUDIO_FFT_NUM_BUFFERS];
 								///< Buffers used within the cab
 
-	ptask_cab_t cab;			///< CAB used to handle allocated buffers
+	ptask_cab_t			cab;	///< CAB used to handle allocated buffers
 
 } audio_fft_t;
 
@@ -189,21 +201,22 @@ typedef struct __AUDIO_STRUCT
 {
 	// NOTICE: When modifying the audio_state_t data structure, consider
 	// which state should be adopted as default state.
-	audio_file_desc_t audio_files[AUDIO_MAX_FILES];
+	audio_file_desc_t	audio_files[AUDIO_MAX_FILES];
 								///< Array of opened audio files descriptors for
 								///< reproduction
 
-	int audio_files_opened;		///< Number of currently opened audio files
+	int					audio_files_opened;
+								///< Number of currently opened audio files
 
-	audio_record_t record;		///< Contains all the data needed to record
+	audio_record_t		record;	///< Contains all the data needed to record
 
-	audio_fft_t fft;			///< Contains all the data needed to perform
+	audio_fft_t			fft;	///< Contains all the data needed to perform
 								///< FFT and IFFT
 
-	audio_analysis_t analysis;	///< Contains all the data needed to perform
+	audio_analysis_t	analysis;///< Contains all the data needed to perform
 								///< analysis of FFTs
 
-	ptask_mutex_t mutex;		///< Protrects access to opened files attributes
+	ptask_mutex_t		mutex;	///< Protrects access to opened files attributes
 								///< in multithreaded environment.
 } audio_state_t;
 
@@ -248,8 +261,9 @@ static audio_state_t audio_state =
  */
 static inline void path_to_basename(char* dest, const char* path)
 {
-char	buffer[MAX_CHAR_BUFFER_SIZE];// Buffer, used to prevent path modifications
-char	*base_name;
+char	buffer[MAX_CHAR_BUFFER_SIZE];	// Buffer, because basename function
+										// may modify its argument
+char*	base_name;						// Basename string pointer
 int		len;
 
 	// The basename function may modify the source string, thus we need to copy
@@ -277,7 +291,8 @@ int		len;
  * Copy the in_buffer into out_buffer, setting to zero padding (if specified in
  * the associated constant).
  */
-static inline void copy_buffer_with_padding(double *out_buffer, const short *in_buffer)
+static inline void copy_buffer_with_padding(
+	double *out_buffer, const short *in_buffer)
 {
 size_t i;
 	// NOTICE: it's not a coincidence I'm using record.rframes instead
@@ -375,18 +390,18 @@ int last_idx;	// The index of the last element (which is a pure real value)
 	//		= ...
 	//		= re(a)*re(b) + im(a)*im(b) + j*(im(a)*re(b) - re(a)*im(b))
 
-	// Thus we can calculate separately the two values as
+	// Thus we can calculate separately the two components of the output as
 	// re(out) = re(a)*re(b) + im(a)*im(b)
 	// im(out) = im(a)*re(b) - re(a)*im(b)
 
-	for(i = 1; i <= number_complex; ++i)
+	for (i = 1; i <= number_complex; ++i)
 	{
 		re_idx = index_real(i);
 		im_idx = index_imaginary(i);
-		output[re_idx] = first_fft[re_idx] * second_fft[re_idx]
-					   + first_fft[im_idx] * second_fft[im_idx];
-		output[im_idx] = first_fft[im_idx] * second_fft[re_idx]
-					   - first_fft[re_idx] * second_fft[im_idx];
+		output[re_idx]	= first_fft[re_idx] * second_fft[re_idx]
+						+ first_fft[im_idx] * second_fft[im_idx];
+		output[im_idx]	= first_fft[im_idx] * second_fft[re_idx]
+						- first_fft[re_idx] * second_fft[im_idx];
 	}
 
 	// Finally, compute the inverse fft
@@ -399,7 +414,7 @@ int last_idx;	// The index of the last element (which is a pure real value)
 static inline double max(double *v, size_t n)
 {
 size_t i;
-double m = v[0];
+double m = v[0];	// The current max
 
 	for (i = 1; i < n; ++i)
 	{
@@ -418,10 +433,12 @@ double m = v[0];
 static inline double correlation_non_normalized(
 	const double *first_fft, const double *second_fft)
 {
-double *buffer;
-ptask_cab_id_t index;
+double*			buffer;
+ptask_cab_id_t	index;
 
-	// Cannot fail
+	// In this case, the cab library is used as a buffer pool, each time a task
+	// reserves a buffer to do its computation of the correlation and releases
+	// it when done
 	ptask_cab_reserve(&audio_state.analysis.cab,
 		STATIC_CAST(void **, &buffer),
 		&index);
@@ -444,8 +461,9 @@ static inline double correlation_normalized(
 	const double *first_fft, const double *second_fft,
 	double first_autocorr, double second_autocorr)
 {
-	double unnormalized = correlation_non_normalized(first_fft, second_fft);
+double unnormalized;	// The non normalized correlation between the two FFTs
 
+	unnormalized = correlation_non_normalized(first_fft, second_fft);
 	return (unnormalized * unnormalized) / (first_autocorr * second_autocorr);
 }
 
@@ -503,19 +521,19 @@ int s = 0;
 
 	if (ms >= 1000)
 	{
-		s = ms / 1000;
-		ms = ms % 1000;
+		s	= ms / 1000;
+		ms	= ms % 1000;
 	}
 
 	const struct timespec req = {
-		.tv_sec = s,
-		.tv_nsec = ms * 1000000L,
+		.tv_sec		= s,
+		.tv_nsec	= ms * 1000000L,
 	};
 
 	// The nanosleep updates req with the remaining time if interrupted, thus
 	// even if interrupted the call waits always for the given amount of ms
 	// before terminating.
-	while(clock_nanosleep(CLOCK_MONOTONIC, 0, &req, NULL))
+	while (clock_nanosleep(CLOCK_MONOTONIC, 0, &req, NULL))
 		;
 }
 
@@ -539,7 +557,8 @@ static inline void wait_seconds_print(int nseconds)
  * Copy file descriptor src into dest. Use this instead of simple assignment
  * operator to skip copying unnecessary buffers.
  */
-static inline void audio_file_copy(audio_file_desc_t *dest, const audio_file_desc_t*src)
+static inline void audio_file_copy(
+	audio_file_desc_t *dest, const audio_file_desc_t*src)
 {
 	if (src->has_rec)
 	{
@@ -562,22 +581,23 @@ static inline void audio_file_copy(audio_file_desc_t *dest, const audio_file_des
  * Initialize an ALSA PCM device handle, either a playback or a recording
  * handle, depending on the value of stream_direction.
  */
-static inline int install_alsa_pcm(snd_pcm_t **alsa_handle_ptr,
-	unsigned int *rrate_ptr, snd_pcm_uframes_t *rframes_ptr,
-	snd_pcm_stream_t stream_direction,
-	int mode
-	)
+static inline int install_alsa_pcm(
+	snd_pcm_t**			alsa_handle_ptr,
+	unsigned int*		rrate_ptr,
+	snd_pcm_uframes_t*	rframes_ptr,
+	snd_pcm_stream_t	stream_direction,
+	int					mode)
 {
-int err;
-
-unsigned int rrate = *rrate_ptr;// Recording acquisition ratio, as accepted
+int					err;		// The returned error code
+unsigned int		rrate;		// Recording acquisition ratio, as accepted
 								// by the device
-snd_pcm_uframes_t rframes = *rframes_ptr;
-								// Period requested to recorder task, expressed
+snd_pcm_uframes_t	rframes;	// Period requested to recorder task, expressed
 								// in terms of number of frames
+snd_pcm_t*			alsa_handle;// ALSA Hardware Handle used to record audio
+snd_pcm_hw_params_t* hw_params; // Parameters used to configure ALSA hardware
 
-snd_pcm_t *alsa_handle;			// ALSA Hardware Handle used to record audio
-snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
+	rrate	= *rrate_ptr;
+	rframes	= *rframes_ptr;
 
 	// Open PCM device
 	err = snd_pcm_open(&alsa_handle, "default", stream_direction, mode);
@@ -607,7 +627,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 
 	// Interleaved mode (we'll use only one channel though, since it's mono)
 	err = snd_pcm_hw_params_set_access(alsa_handle, hw_params,
-									   SND_PCM_ACCESS_RW_INTERLEAVED);
+		SND_PCM_ACCESS_RW_INTERLEAVED);
 	if (err < 0)
 	{
 		print_log(LOG_VERBOSE, "Failed to set interleaved mode on ALSA PCM.\r\n");
@@ -616,7 +636,7 @@ snd_pcm_hw_params_t *hw_params; // Parameters used to configure ALSA hardware
 
 	// Signed 16-bit little-endian format
 	err = snd_pcm_hw_params_set_format(alsa_handle, hw_params,
-									   SND_PCM_FORMAT_S16_LE);
+		SND_PCM_FORMAT_S16_LE);
 	if (err < 0)
 	{
 		print_log(LOG_VERBOSE, "Failed to set 16bit LE format on ALSA PCM.\r\n");
@@ -772,16 +792,15 @@ static inline int install_fftw(snd_pcm_uframes_t rframes,
 	fftw_plan* fft_plan_ptr,
 	fftw_plan* fft_plan_inverse_ptr)
 {
-int err;
-int index;
-
-void *cab_pointers[AUDIO_FFT_NUM_BUFFERS];
+int		err;
+int		index;
+void*	cab_pointers[AUDIO_FFT_NUM_BUFFERS];
 								// Pointers to buffers used in cab library
-
-double *inout;					// Array that will be used to create a
+double*	inout;					// Array that will be used to create a
 								// FFTW3 plan
-
-char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
+char	wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
+								// Full path of the wisdom file, obtained from
+								// working directory path
 
 	// Getting absolute path for wisdom file location
 	strncpy(wisdom_filepath, working_directory(), MAX_CHAR_BUFFER_SIZE);
@@ -810,17 +829,17 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
 
 	// The returned plan is guaranteed not to be NULL
 	*fft_plan_ptr = fftw_plan_r2r_1d(rframes,
-									 inout,
-									 inout,
-									 FFTW_R2HC,
-									 FFTW_EXHAUSTIVE); // OR FFTW_PATIENT
+		inout,
+		inout,
+		FFTW_R2HC,
+		FFTW_EXHAUSTIVE); // OR FFTW_PATIENT
 
 	// The returned plan is for the inverse FFT
 	*fft_plan_inverse_ptr = fftw_plan_r2r_1d(rframes,
-											 inout,
-											 inout,
-											 FFTW_HC2R,
-											 FFTW_EXHAUSTIVE); // OR FFTW_PATIENT
+		inout,
+		inout,
+		FFTW_HC2R,
+		FFTW_EXHAUSTIVE); // OR FFTW_PATIENT
 
 	// Saving back updated wisdom to dat file
 	fftw_export_wisdom_to_filename(wisdom_filepath);
@@ -841,9 +860,9 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
 	// Initializing FFT CAB buffers, the pointers are copied to the cab
 	// structure
 	err = ptask_cab_init(&audio_state.fft.cab,
-						 AUDIO_FFT_NUM_BUFFERS,
-						 AUDIO_DESIRED_PADBUFFER_SIZE,
-						 cab_pointers);
+		AUDIO_FFT_NUM_BUFFERS,
+		AUDIO_DESIRED_PADBUFFER_SIZE,
+		cab_pointers);
 
 	return err;
 }
@@ -853,10 +872,10 @@ char wisdom_filepath[MAX_CHAR_BUFFER_SIZE];
  */
 static inline int install_analysis()
 {
-int err;
-int index;
-
-void *cab_pointers[AUDIO_FFT_NUM_BUFFERS];	// Pointers to buffers used in cab library
+int		err;
+int		index;
+void*	cab_pointers[AUDIO_FFT_NUM_BUFFERS];
+									// Pointers to buffers used in cab library
 
 	// Construction of CAB pointers for analysis buffers
 	for (index = 0; index < AUDIO_FFT_NUM_BUFFERS; ++index)
@@ -867,9 +886,9 @@ void *cab_pointers[AUDIO_FFT_NUM_BUFFERS];	// Pointers to buffers used in cab li
 	// Initializing FFT CAB buffers, the pointers are copied to the cab
 	// structure
 	err = ptask_cab_init(&audio_state.analysis.cab,
-						 AUDIO_FFT_NUM_BUFFERS,
-						 AUDIO_DESIRED_PADBUFFER_SIZE,
-						 cab_pointers);
+		AUDIO_FFT_NUM_BUFFERS,
+		AUDIO_DESIRED_PADBUFFER_SIZE,
+		cab_pointers);
 
 	return err;
 }
@@ -926,7 +945,6 @@ int missing = nframes;	// How many frames are still missing
 
 		if (err < 0)
 		{
-
 #ifdef NDEBUG
 			// Release mode, function returns with an error if an error
 			// different than -EAGAIN occurs
@@ -954,7 +972,7 @@ int missing = nframes;	// How many frames are still missing
 #else
 			// In debug mode, program prints some extra information, but aborts
 			// if an error occurs
-			switch(err)
+			switch (err)
 			{
 			case -EAGAIN:
 				// No big deal, we can suspend for some time
@@ -1014,6 +1032,10 @@ static inline int mic_stop()
 
 #ifdef AUDIO_APERIODIC
 
+// -----------------------------------------------------------------------------
+//               FUNCTIONS PRESENT ONLY IN THE APERIODIC VERSION
+// -----------------------------------------------------------------------------
+
 /**
  * Updates the counter of the number of available frames to be read from
  * capture buffer.
@@ -1045,7 +1067,7 @@ static inline void mic_wait_for_avail()
 	ptask_mutex_lock(&audio_state.record.availability_mutex);
 
 	// If the task should terminate, a signal will be sent by the other task
-	while(audio_state.record.avail < audio_state.record.rframes &&
+	while (audio_state.record.avail < audio_state.record.rframes &&
 		!main_get_tasks_terminate())
 	{
 		ptask_cond_wait(&audio_state.record.availability_cond,
@@ -1102,14 +1124,16 @@ int err;
 	err = mic_prepare();
 	if (err)
 	{
-		print_log(LOG_VERBOSE, "Could not prepare the microphone for audio acquisition.\r\n");
+		print_log(LOG_VERBOSE, "Could not prepare the microphone "
+			"for audio acquisition.\r\n");
 		return err;
 	}
 
 	err = mic_read_blocking(buffer, audio_state.record.rframes);
 	if (err)
 	{
-		print_log(LOG_VERBOSE, "Could not record properly the trigger sample!\r\n");
+		print_log(LOG_VERBOSE, "Could not record properly the "
+			"trigger sample!\r\n");
 		return err;
 	}
 
@@ -1117,7 +1141,8 @@ int err;
 	err = mic_stop();
 	if (err)
 	{
-		print_log(LOG_VERBOSE, "Could not properly stop the microphone acquisition!\r\n");
+		print_log(LOG_VERBOSE, "Could not properly stop the microphone "
+			"acquisition!\r\n");
 		return err;
 	}
 
@@ -1165,22 +1190,21 @@ int audio_init()
 {
 int err;
 
-unsigned int 		rrate	= AUDIO_DESIRED_RATE;
-								// Recording acquisition ratio, as accepted by
+unsigned int		rrate;		// Recording acquisition ratio, as accepted by
 								// the device
-
-snd_pcm_uframes_t	rframes	= AUDIO_DESIRED_FRAMES;
-								// Period requested to recorder task, expressed
+snd_pcm_uframes_t	rframes;	// Period requested to recorder task, expressed
 								// in terms of number of frames
-
-snd_pcm_t *record_handle;		// ALSA Hardware Handle used to record audio
-snd_pcm_t *playback_handle;		// ALSA Hardware Handle used to playback recorded audio
-
-fftw_plan fft_plan;				// The FFTW3 plan, which is the algorithm that will
+snd_pcm_t*			record_handle;	// ALSA Hardware Handle used to record audio
+snd_pcm_t*			playback_handle;// ALSA Hardware Handle used to playback
+									// recorded audio
+fftw_plan			fft_plan;	// The FFTW3 plan, which is the algorithm that will
 								// be used to calculate the FFT, optimized for
 								// the size of the recording buffer
+fftw_plan			fft_plan_inverse;
+								// The FFTW3 plan used to compute the inverse FFT
 
-fftw_plan fft_plan_inverse;		// The FFTW3 plan used to compute the inverse FFT
+	rrate	= AUDIO_DESIRED_RATE;
+	rframes	= AUDIO_DESIRED_FRAMES;
 
 	// Mutexes and condition variables initialization
 	err = ptask_mutex_init(&audio_state.mutex);
@@ -1287,7 +1311,7 @@ int err = 0;
 		--audio_state.audio_files_opened;
 
 		// Shift back array, starting from position of i
-		for(; i < audio_state.audio_files_opened; ++i)
+		for (; i < audio_state.audio_files_opened; ++i)
 		{
 			audio_file_copy(
 				&audio_state.audio_files[i],
@@ -1356,7 +1380,9 @@ audio_file_desc_t	file;
 		}
 	}
 	else
+	{
 		err = EINVAL;
+	}
 
 	return err;
 }
@@ -1449,7 +1475,7 @@ int ret;
 
 audio_type_t audio_file_type(int i)
 {
-	// Safe since the audio type cannot  be modified in multithreaded
+	// Safe since the audio type cannot be modified in multithreaded
 	// environment
 
 	if (i >= audio_state.audio_files_opened)
@@ -1661,16 +1687,15 @@ int err;
 	// Wait a few seconds to let the user get the timing right
 	wait_seconds_print(COUNTDOWN_SECONDS);
 
-	// Record it
 	err = record_sample(audio_state.audio_files[i].recorded_sample);
-	if(err)
+	if (err)
 		return err;
 
 	audio_state.audio_files[i].has_rec = true;
 
 	// Calculate the FFT of the signal once for later use
 	copy_buffer_with_padding(audio_state.audio_files[i].recorded_fft,
-							audio_state.audio_files[i].recorded_sample);
+		audio_state.audio_files[i].recorded_sample);
 
 	fft(audio_state.audio_files[i].recorded_fft);
 
@@ -1690,7 +1715,8 @@ int err;
 
 	if (!audio_file_is_open(i) || !audio_state.audio_files[i].has_rec)
 	{
-		printf("The specified file does not exist or has no associated recording!\r\n");
+		printf("The specified file does not exist or has no "
+			"associated recording!\r\n");
 		return;
 	}
 
@@ -1698,8 +1724,8 @@ int err;
 	if (err)
 		abort_on_error("ALSA PLAYBACK FAILURE!");
 
-	err = playback_buffer_blocking(
-		audio_state.audio_files[i].recorded_sample, audio_state.record.rframes);
+	err = playback_buffer_blocking(audio_state.audio_files[i].recorded_sample,
+		audio_state.record.rframes);
 	if (err)
 		abort_on_error("ALSA PLAYBACK FAILURE!");
 
@@ -1720,16 +1746,14 @@ void audio_file_discard_recorded_sample(int i)
 
 #ifdef AUDIO_APERIODIC
 
+// -----------------------------------------------------------------------------
+//               TASKS PRESENT ONLY IN THE APERIODIC VERSION
+// -----------------------------------------------------------------------------
+
 /// The body of the check data task
 void* checkdata_task(void *arg)
 {
-ptask_t*	tp;			// task pointer
-// int			task_id;	// task identifier
-
-	tp = STATIC_CAST(ptask_t *, arg);
-	// task_id = ptask_get_id(tp);
-
-	// Variables initialization and initial computation
+ptask_t* tp = STATIC_CAST(ptask_t *, arg);
 
 	ptask_start_period(tp);
 
@@ -1752,23 +1776,15 @@ ptask_t*	tp;			// task pointer
 /// The body of the microphone task
 void* microphone_task(void *arg)
 {
-ptask_t*	tp;			// task pointer
-// int			task_id;	// task identifier
-
-// Local variables
-int		err;
-
-int 	buffer_index;	// Index of local buffer used to get microphone data
+ptask_t*	tp;			// Task pointer
+int			err;
+int			buffer_index;// Index of local buffer used to get microphone data
 						// used to access cab
-short	*buffer;		// Pointer to local buffer, changes each time the buffer
+short*		buffer;		// Pointer to local buffer, changes each time the buffer
 						// is full
 
 	tp = STATIC_CAST(ptask_t *, arg);
-	// task_id = ptask_get_id(tp);
 
-	// Variables initialization and initial computation
-
-	// Preparing the microphone interface to be used
 	err = mic_prepare();
 	if (err)
 		abort_on_error("Could not prepare microphone acquisition.");
@@ -1801,7 +1817,7 @@ short	*buffer;		// Pointer to local buffer, changes each time the buffer
 			// amount of time and doing that in the same task reduces
 			// drastically the delay.
 
-			// NOTICE: Nobody can overwrite my audio buffer even after the
+			// NOTICE: Nobody can overwrite this audio buffer even after the
 			// release with the putmes, because this task is the only one
 			// doing the putmes on this cab.
 			do_fft(buffer);
@@ -1809,8 +1825,8 @@ short	*buffer;		// Pointer to local buffer, changes each time the buffer
 			// Get a local buffer from the CAB
 			// There is no check because it never fails if used correcly
 			ptask_cab_reserve(&audio_state.record.cab,
-								STATIC_CAST(void**, &buffer),
-								&buffer_index);
+				STATIC_CAST(void**, &buffer),
+				&buffer_index);
 		}
 
 		// Since we removed data from the buffer, better update data count by
@@ -1841,26 +1857,25 @@ short	*buffer;		// Pointer to local buffer, changes each time the buffer
 
 #else
 
+// -----------------------------------------------------------------------------
+//                 TASKS PRESENT ONLY IN THE PERIODIC VERSION
+// -----------------------------------------------------------------------------
+
 /// The body of the microphone task
 void* microphone_task(void *arg)
 {
-ptask_t*	tp;			// task pointer
-// int			task_id;	// task identifier
+ptask_t*	tp;			// Task pointer
+int			err;
+int			buffer_index;	// Index of local buffer used to get
+							// microphone data used to access cab
+short*		buffer;			// Pointer to local buffer, changes each time
+							// the buffer is full
+int			how_many_read;	// How many frames are already in the buffer
+int			missing;		// How many frames are missing
 
-// Local variables
-int		err;
-
-int 	buffer_index;	// Index of local buffer used to get microphone data
-						// used to access cab
-short	*buffer;		// Pointer to local buffer, changes each time the buffer
-						// is full
-int		how_many_read;	// How many frames are already in the buffer
-int		missing;		// How many frames are missing
-
-	tp = STATIC_CAST(ptask_t *, arg);
-	// task_id = ptask_get_id(tp);
-
-	// Variables initialization and initial computation
+	tp				= STATIC_CAST(ptask_t *, arg);
+	how_many_read	= 0;
+	missing			= audio_state.record.rframes;
 
 	// Preparing the microphone interface to be used
 	err = mic_prepare();
@@ -1872,10 +1887,9 @@ int		missing;		// How many frames are missing
 	// Get a local buffer from the CAB
 	// There is no check because it never fails if used correcly
 	ptask_cab_reserve(&audio_state.record.cab,
-					  STATIC_CAST(void *, &buffer),
-					  &buffer_index);
-	how_many_read	= 0;
-	missing			= audio_state.record.rframes;
+		STATIC_CAST(void *, &buffer),
+		&buffer_index);
+
 
 	while (!main_get_tasks_terminate())
 	{
@@ -1907,8 +1921,8 @@ int		missing;		// How many frames are missing
 				// Get a local buffer from the CAB
 				// There is no check because it never fails if used correcly
 				ptask_cab_reserve(&audio_state.record.cab,
-								  STATIC_CAST(void**, &buffer),
-								  &buffer_index);
+					STATIC_CAST(void**, &buffer),
+					&buffer_index);
 
 				how_many_read	= 0;
 				missing			= audio_state.record.rframes;
@@ -1927,7 +1941,6 @@ int		missing;		// How many frames are missing
 	if (err)
 		abort_on_error("Could not stop properly the microphone acquisition.");
 
-
 	// Releasing unused half-empty buffer, this is needed because the reset does
 	// not release any buffer that was previously reserved
 	ptask_cab_unget(&audio_state.record.cab, buffer_index);
@@ -1945,31 +1958,24 @@ int		missing;		// How many frames are missing
 /// The body of the analyzer task
 void *analysis_task(void *arg)
 {
-ptask_t *tp; // task pointer
-// int task_id; // task identifier
-
-// Local variables
-struct timespec last_timestamp = { .tv_sec = 0, .tv_nsec = 0};
-								// Timestamp of last accessed FFT
-struct timespec new_timestamp;	// Timestamp of the new FFT
-
-int file_index;					// Index of the file that has been associated
-								// with this task
-
-const fft_output_t *fft_ptr;	// The pointer to the most recent FFT
-								// within the CAB
-ptask_cab_id_t fft_id;			// The id of the most recent FFT within the CAB
-
-double correlation;				// The normalized correlation value between the
-								// most recent FFT and the audio sample
-								// associated with this task
-
-int err;
+ptask_t*			tp; // Task pointer
+struct timespec		last_timestamp;	// Timestamp of last accessed FFT
+struct timespec		new_timestamp;	// Timestamp of the new FFT
+int					file_index;		// Index of the file that has been
+									// associated with this task
+const fft_output_t*	fft_ptr;		// The pointer to the most recent FFT
+									// within the CAB
+ptask_cab_id_t		fft_id;			// The id of the most recent FFT within
+									// the CAB
+double				correlation;	// The normalized correlation value between the
+									// most recent FFT and the audio sample
+									// associated with this task
+int					err;
 
 	tp = STATIC_CAST(ptask_t *, arg);
-	// task_id = ptask_get_id(tp);
 
-	// Variables initialization and initial computation
+	last_timestamp.tv_sec	= 0;
+	last_timestamp.tv_nsec	= 0;
 
 	// Get the associated file index as it is the only argument
 	file_index = *STATIC_CAST(int*, &tp->args);
@@ -1989,7 +1995,8 @@ int err;
 		{
 			last_timestamp = new_timestamp;
 
-			correlation = correlation_normalized(			audio_state.audio_files[file_index].recorded_fft,
+			correlation = correlation_normalized(
+				audio_state.audio_files[file_index].recorded_fft,
 				fft_ptr->fft,
 				audio_state.audio_files[file_index].autocorr,
 				fft_ptr->autocorr
@@ -2001,23 +2008,8 @@ int err;
 
 			if (fabs(correlation) > AUDIO_THRESHOLD)
 			{
-				// We start every time a new execution, there is no need for a
-				// decay of the trigger because the time window is not exactly
-				// too small
+				// We start every time a new execution
 				audio_file_play(file_index);
-				/*
-				struct timespec the_delay;
-				struct timespec now;
-
-				clock_gettime(CLOCK_MONOTONIC, &now);
-
-				time_diff(&the_delay, now, new_timestamp);
-
-				printf("TASK_ALS delay since FFT publication on audio recognition: "
-					"%lld.%.9ld seconds.\r\n",
-					(long long)the_delay.tv_sec,
-					the_delay.tv_nsec);
-				*/
 			}
 		}
 

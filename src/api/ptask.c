@@ -61,7 +61,7 @@ static inline bool _ptask_canallocate()
  */
 static inline int _ptask_new_id()
 {
-	if(!_ptask_canallocate())
+	if (!_ptask_canallocate())
 		return -1;
 
 	do
@@ -80,7 +80,7 @@ static inline int _ptask_new_id()
  */
 static inline void _ptask_free_id(ptask_t *ptask)
 {
-	if(_ptask_isvalid_id(ptask))
+	if (_ptask_isvalid_id(ptask))
 	{
 		--_ntasks;
 		_used_ids[ptask->id] = false;
@@ -490,7 +490,7 @@ int ptask_cab_init(ptask_cab_t *ptask_cab, int n, int size, void *buffers[])
 {
 int i;
 
-	if(n > PTASK_CAB_MAX_SIZE)
+	if (n > PTASK_CAB_MAX_SIZE)
 		return EINVAL;
 
 	if (!_ptask_cab_canallocate())
@@ -504,7 +504,7 @@ int i;
 	ptask_cab->last_index = -1;
 	// timestamp remains uninitialized
 
-	for(i = 0; i < n; ++i)
+	for (i = 0; i < n; ++i)
 		ptask_cab->buffers[i] = buffers[i];
 
 	ptask_mutex_init(&ptask_cab->_mux);
@@ -551,7 +551,7 @@ int err = 0;
 
 	ptask_mutex_lock(&ptask_cab->_mux);
 
-	if(ptask_cab->busy[b_id] != 1 || ptask_cab->last_index == b_id)
+	if (ptask_cab->busy[b_id] != 1 || ptask_cab->last_index == b_id)
 		err = EINVAL;
 	else
 	{
@@ -572,7 +572,7 @@ int err = 0;
 
 	ptask_mutex_lock(&ptask_cab->_mux);
 
-	if(ptask_cab->last_index < 0)
+	if (ptask_cab->last_index < 0)
 		err = EAGAIN;
 	else
 	{
@@ -584,7 +584,7 @@ int err = 0;
 
 	ptask_mutex_unlock(&ptask_cab->_mux);
 
-	if(!err)
+	if (!err)
 		*buffer = ptask_cab->buffers[*b_id];
 
 	return err;
@@ -596,7 +596,7 @@ int err = 0;
 
 	ptask_mutex_lock(&ptask_cab->_mux);
 
-	if(ptask_cab->busy[b_id] < 1)
+	if (ptask_cab->busy[b_id] < 1)
 		err = EINVAL;
 	else
 		--ptask_cab->busy[b_id];

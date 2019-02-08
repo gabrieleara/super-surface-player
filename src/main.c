@@ -76,13 +76,12 @@ static main_state_t main_state =
 {
 	.tasks_terminate	= false,
 	.quit				= false,
+	.directory			= "",
 #ifdef NDEBUG
 	.log_level			= 0,
 #else
-	// In debug it is automatically verbose
-	.log_level			= LOG_VERBOSE,
+	.log_level			= LOG_VERBOSE,	// In debug it is automatically verbose
 #endif
-	.directory			= "",
 };
 
 
@@ -95,20 +94,12 @@ bool verbose()
 	return main_state.log_level & LOG_VERBOSE;
 }
 
-/**
- * Returns the log level mask of the system.
- */
-int log_level()
-{
-	return main_state.log_level;
-}
-
 void print_log(int level, const char* format, ...)
 {
 	va_list args;
 	va_start(args, format);
 
-	if(log_level() & level)
+	if (main_state.log_level & level)
 		vprintf(format, args);
 
 	va_end(args);
@@ -221,17 +212,16 @@ static inline int read_arguments(int argc, char* argv[])
 {
 int			err = 0, i, len;
 const char*	str;
-
 int			cwdlen;
 char		cwd[MAX_CHAR_BUFFER_SIZE];	// It will contain the current directory
 										// from which the program has been started.
-bool		directory_already_specified = false;
-										// If false we won't accept any other
+bool		directory_already_specified;// If false we won't accept any other
 										// directory specification in the
 										// command line arguments
-
 int			begin = 0;					// The index from which we will copy the
 										// given directory in the main_state.directory
+
+	directory_already_specified = false;
 
 	// Get the directory in which the program has been launched
 	getcwd(cwd, sizeof(cwd));
@@ -329,20 +319,23 @@ static inline void cmd_help()
 	printf(" list\t\tList all the opened audio/midi files.\r\n");
 	printf(" listen\t<fnum>\tListen to the specified audio/midi file.\r\n");
 	printf(" play\t\tTo start playing in windowed mode.\r\n");
-	printf(" playback\t<fnum>\tListen to the recorded sample associated with the specified audio/midi file.\r\n");
+	printf(" playback\t<fnum>\tListen to the recorded sample associated with "
+		"the specified audio/midi file.\r\n");
 	printf(" pwd\t\tPrint current working directory.\r\n");
 	printf(" open\t<fname>\tTo open a new audio/midi file.\r\n");
 	printf(" quit\t\tTo quit this program.\r\n");
-	printf(" record\t<fnum>\tTo record an audio input that will trigger the file specified by the num.\r\n");
+	printf(" record\t<fnum>\tTo record an audio input that will trigger the "
+		"file specified by the num.\r\n");
 
 	printf("\r\n");
 
-	printf(" \t\tTo see the <fnum> associated to a file, use the list command.\r\n");
+	printf(" \t\tTo see the <fnum> associated to a file, use the list "
+		"command.\r\n");
 
 	printf("\r\n");
 
-	printf(" \t\tThe specified <fname> shall be an absolute path or a relative "
-			"path to the\r\n\t\tcurrent working directory.\r\n");
+	printf(" \t\tThe specified <fname> shall be an absolute path "
+		"or a relative path to the\r\n\t\tcurrent working directory.\r\n");
 
 	printf("\r\n");
 }
@@ -384,7 +377,8 @@ int		err = 0;
 			printf("Could not load the specified file.\r\n");
 			break;
 		case EAGAIN:
-			printf("Cannot open any more files, close at least one file to open the specified one.\r\n");
+			printf("Cannot open any more files!\r\n"
+				"Close at least one file to open the specified one.\r\n");
 			break;
 		default:
 			assert(false);
@@ -499,7 +493,8 @@ int i;
 
 			printf("\r\n");
 		}
-		printf("\r\nFiles with a * have an associated recorded sample.\r\n\r\n");
+		printf("\r\nFiles with a * have an associated recorded sample."
+			"\r\n\r\n");
 	}
 }
 
@@ -718,16 +713,15 @@ int err;
  */
 static inline int start_gui_task()
 {
-	return
-		ptask_short(
-			&main_state.tasks[TASK_GUI],
-			TASK_GUI_WCET,
-			TASK_GUI_PERIOD,
-			TASK_GUI_DEADLINE,
-			GET_PRIO(TASK_GUI_PRIORITY),
-			gui_task,
-			NULL,
-			0);
+	return ptask_short(
+		&main_state.tasks[TASK_GUI],
+		TASK_GUI_WCET,
+		TASK_GUI_PERIOD,
+		TASK_GUI_DEADLINE,
+		GET_PRIO(TASK_GUI_PRIORITY),
+		gui_task,
+		NULL,
+		0);
 }
 
 /**
@@ -735,35 +729,34 @@ static inline int start_gui_task()
  */
 static inline int start_ui_task()
 {
-	return
-		ptask_short(
-			&main_state.tasks[TASK_UI],
-			TASK_UI_WCET,
-			TASK_UI_PERIOD,
-			TASK_UI_DEADLINE,
-			GET_PRIO(TASK_UI_PRIORITY),
-			user_interaction_task,
-			NULL,
-			0);
+	return	ptask_short(
+		&main_state.tasks[TASK_UI],
+		TASK_UI_WCET,
+		TASK_UI_PERIOD,
+		TASK_UI_DEADLINE,
+		GET_PRIO(TASK_UI_PRIORITY),
+		user_interaction_task,
+		NULL,
+		0);
 }
 
 #ifdef AUDIO_APERIODIC
 /**
  * Initializes and starts the task that checks how many frames are available,
  * returning zero on success.
+ * This task of course exists only in the aperiodic version of the program.
  */
 static inline int start_checkdata_task()
 {
-	return
-		ptask_short(
-			&main_state.tasks[TASK_CHK],
-			TASK_CHK_WCET,
-			TASK_CHK_PERIOD,
-			TASK_CHK_DEADLINE,
-			GET_PRIO(TASK_CHK_PRIORITY),
-			checkdata_task,
-			NULL,
-			0);
+	return	ptask_short(
+		&main_state.tasks[TASK_CHK],
+		TASK_CHK_WCET,
+		TASK_CHK_PERIOD,
+		TASK_CHK_DEADLINE,
+		GET_PRIO(TASK_CHK_PRIORITY),
+		checkdata_task,
+		NULL,
+		0);
 }
 #endif
 
@@ -772,16 +765,15 @@ static inline int start_checkdata_task()
  */
 static inline int start_microphone_task()
 {
-	return
-		ptask_short(
-			&main_state.tasks[TASK_MIC],
-			TASK_MIC_WCET,
-			TASK_MIC_PERIOD,
-			TASK_MIC_DEADLINE,
-			GET_PRIO(TASK_MIC_PRIORITY),
-			microphone_task,
-			NULL,
-			0);
+	return	ptask_short(
+		&main_state.tasks[TASK_MIC],
+		TASK_MIC_WCET,
+		TASK_MIC_PERIOD,
+		TASK_MIC_DEADLINE,
+		GET_PRIO(TASK_MIC_PRIORITY),
+		microphone_task,
+		NULL,
+		0);
 }
 
 /**
@@ -919,17 +911,20 @@ int err;
 #ifdef NDEBUG
 	// Program has not been compiled for debug, so I can use real-time
 	// scheduling
-	err = ptask_set_scheduler(SCHED_FIFO); if (err) return err;
+	err = ptask_set_scheduler(SCHED_FIFO);
+	if (err) return err;
 #else
 	// Cannot debug using sudo privileges, so for debugging purposes I'll use
 	// another scheduler
-	err = ptask_set_scheduler(SCHED_OTHER); if (err) return err;
+	err = ptask_set_scheduler(SCHED_OTHER);
+	if (err) return err;
 #endif
 
 	// Allegro initialization
 	err = allegro_init();
 	if (err) return err;
 
+	// Allegro timer initialization
 	err = install_timer();
 	if (err) return err;
 
@@ -981,9 +976,9 @@ int err;
 		AUDIO_DESIRED_PERIOD);
 
 #ifdef AUDIO_APERIODIC
-	print_log(LOG_VERBOSE, "This is the APERIDIC version of the acquisition task.\r\n");
+	print_log(LOG_VERBOSE, "This is the APERIDIC version of the program.\r\n");
 #else
-	print_log(LOG_VERBOSE, "This is the timer-based version of the acquisition task.\r\n");
+	print_log(LOG_VERBOSE, "This is the timer-based version of the program.\r\n");
 #endif
 
 	while (!main_state.quit)

@@ -86,7 +86,7 @@ ptask_set_scheduler(SCHED_RR);
 // longer than the lifetime of the relative task
 ptask_t task0;
 
-if(ptask_short(&task0, 10000l, 20, 20, 1, task_body, NULL, 0))
+if (ptask_short(&task0, 10000l, 20, 20, 1, task_body, NULL, 0))
 {
 	printf("Something wrong happened!");
 	return -1;
@@ -148,8 +148,8 @@ ptask_join(task0);
  * - PS_ERROR: for an erroneous task state.
  */
 typedef enum __PTASK_ENUM {
-	PS_ERROR = -1,
-	PS_FREE = 0,
+	PS_ERROR	= -1,
+	PS_FREE		= 0,
 	PS_NEW,
 	//PS_ACTIVE,
 	PS_JOINABLE
@@ -198,18 +198,21 @@ typedef pthread_cond_t ptask_cond_t;
  */
 typedef struct __PTASK_CAB
 {
-	int	id;							///< identificator of the cab
-	int num_buffers;				///< number of buffers in the cab
-	int size_buffers;				///< size of each buffer in the cab in bytes (all equal)
+	int	id;							///< Identificator of the cab
+	int num_buffers;				///< Number of buffers in the cab
+	int size_buffers;				///< Size of each buffer in the cab in
+									///< bytes (all equal)
 
 	void *buffers[PTASK_CAB_MAX_SIZE];
-									///< pointers to the actual buffers
+									///< Pointers to the actual buffers
 
-	int busy[PTASK_CAB_MAX_SIZE];	///< number of tasks using each buffer
-	int last_index;					///< pointer to the current last data buffer
-	struct timespec timestamp;		///< time at which the most recent buffer has been inserted
+	int busy[PTASK_CAB_MAX_SIZE];	///< Number of tasks using each buffer
+	int last_index;					///< Pointer to the current last data buffer
+	struct timespec timestamp;		///< Time at which the most recent buffer
+									///< has been inserted
 
-	ptask_mutex_t _mux;				///< mutex semaphore used to access the cab structure
+	ptask_mutex_t _mux;				///< Mutex semaphore used to protect access
+									///< to the cab structure
 } ptask_cab_t;
 
 /**

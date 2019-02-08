@@ -52,7 +52,7 @@ DOXFLAGS = > /dev/null 2> /dev/null
 CC = gcc
 
 # Compilation options
-CFLAGS += -Wall -Wextra -pedantic
+override CFLAGS += -Wall -Wextra -pedantic
 
 # Include paths
 INCLUDES = -iquote inc
@@ -61,8 +61,7 @@ INCLUDES = -iquote inc
 LDLIBS = -lpthread -lm -lrt -lasound -lfftw3
 LDALLEGRO = `allegro-config --libs`
 
-# Adds includes declaration in COMPILE.c rule, so that CFLAGS/CPPFLAGS are
-# untouched and can be modified from outside
+# Adds includes declaration in COMPILE.c rule
 COMPILE.c += $(INCLUDES)
 
 # Specifies where to put object files
@@ -108,7 +107,7 @@ help:
 
 # Default compilation command
 # NOTICE: in this case resources are always copied from res to distribution folder
-compile-release: CFLAGS += -D NDEBUG
+compile-release: override CFLAGS += -D NDEBUG
 compile-release: compile
 
 compile: $(DEST)
@@ -127,7 +126,7 @@ directories: $(DIRECTORIES)
 # Compile in debug mode
 debug: directories compile-debug
 
-compile-debug: CFLAGS += -ggdb -O0
+compile-debug: override CFLAGS += -ggdb -O0
 compile-debug: LDFLAGS += -ggdb
 compile-debug: compile
 	cp -R $(DIR_RES) $(DIR_SRC)

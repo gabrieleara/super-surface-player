@@ -42,13 +42,13 @@ int time_cmp(struct timespec t1, struct timespec t2)
 
 int time_diff(struct timespec *tdest, struct timespec t2, struct timespec t1)
 {
-	if(time_cmp(t2, t1) < 0)
+	if (time_cmp(t2, t1) < 0)
 		return -1;
 
 	tdest->tv_sec = t2.tv_sec - t1.tv_sec;
 	tdest->tv_nsec = t2.tv_nsec - t1.tv_nsec;
 
-	if(tdest->tv_nsec < 0)
+	if (tdest->tv_nsec < 0)
 	{
 		tdest->tv_nsec = 1000000000 - tdest->tv_nsec;
 		tdest->tv_sec -= 1;

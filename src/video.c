@@ -40,9 +40,11 @@
 #define BITMAP_BACKGROUND_PATH	BITMAP_RES_FOLDER "background.bmp"
 										///< Background bitmap relative path
 #define BITMAP_S_ELEMENT_PATH	BITMAP_RES_FOLDER "element.bmp"
-										///< Sample-based audio entry bitmap relative path
+										///< Sample-based audio entry bitmap
+										///< relative path
 #define BITMAP_M_ELEMENT_PATH	BITMAP_RES_FOLDER "element_midi.bmp"
-										///< MIDI-based audio entry bitmap relative path
+										///< MIDI-based audio entry bitmap
+										///< relative path
 
 #define STR_VOLUME		"Volume"			///< Volume control string
 #define STR_PANNING		"Panning"			///< Panning control string
@@ -93,9 +95,9 @@
  * > The `mouse_pos` variable has the current X coordinate in the upper 16 bits
  * > and the Y coordinate on the lower 16 ones.
  */
-#define MOUSE_POS_TO_X(pos) (pos >> 16)
+#define MOUSE_POS_TO_X(pos)	(pos >> 16)
 /// Returns the mouse Y position. See MOUSE_POS_TO_X() for futher details.
-#define MOUSE_POS_TO_Y(pos) (pos & 0x0000FFFF)
+#define MOUSE_POS_TO_Y(pos)	(pos & 0x0000FFFF)
 
 
 // -----------------------------------------------------------------------------
@@ -125,13 +127,14 @@ typedef struct __GUI_STRUCT
 	// which state should be adopted as default state.
 
 	BITMAP*		virtual_screen;	///< Virtual screen, used to handle all gui
-								///< operations, it is copied in the actual screen
-								///< when refreshed
+								///< operations, it is copied in the actual
+								///< screen when refreshed
 
 	gui_static_t static_screen;	///< Contains all the gui bitmaps
 
-	bool		initialized;	///< Tells if this interface has been initialized
-								///< i.e.\ all bitmaps are loaded and so on
+	bool		initialized;	///< Tells if this interface has been
+								///< initialized, i.e.\ all bitmaps are loaded
+								///< and so on
 
 	bool		mouse_initialized;
 								///< Tells if the mouse handler has been
@@ -151,7 +154,9 @@ typedef struct __GUI_STRUCT
  */
 typedef enum __BUTTON_ID_ENUM
 {
-	BUTTON_INVALID = -1,	///< A non valid button, used when a button id is returned
+	BUTTON_INVALID = -1,	///< A non valid button,
+							///< used when a button id is returned to signal
+							///< an error condition or no button
 	BUTTON_PLAY,			///< Play button
 	BUTTON_VOL_DOWN,		///< Volume down
 	BUTTON_VOL_UP,			///< Volume up
@@ -188,18 +193,13 @@ static gui_state_t gui_state =
 static inline void draw_fft_vertical_scale(BITMAP* background)
 {
 int pixel_increase; // The number of pixels between each tick
-// int freq_increase;	// The frequency span between two ticks
 int pixel_offset;	// The column where to print the label
-// int freq_next;		// The next label to print
-// char buffer[6];		// Buffer used to print text on the background
 int i;
 
 	pixel_offset	= 0;
-	// freq_next		= 0;
 	pixel_increase	= (FFT_PLOT_HEIGHT-2) / FFT_PLOT_Y_TICKS;
-	// freq_increase	= audio_get_fft_rrate() / 2 / FFT_PLOT_Y_TICKS;
 
-	for(i = 0; i <= FFT_PLOT_Y_TICKS; ++i)
+	for (i = 0; i <= FFT_PLOT_Y_TICKS; ++i)
 	{
 		// Draw the tick
 		rectfill(background,
@@ -210,20 +210,7 @@ int i;
 			COLOR_TEXT_PRIM
 		);
 
-		// sprintf(buffer, "%d", freq_next);
-		/*
-		textout_centre_ex(background,
-			font,
-			buffer,
-			FFT_PLOT_X	+ pixel_offset,
-			FFT_PLOT_MY	+ 10,
-			COLOR_TEXT_PRIM,
-			COLOR_BKG
-		);
-		*/
-
 		pixel_offset += pixel_increase;
-		// freq_next += freq_increase;
 	}
 
 	rectfill(background,
@@ -233,16 +220,6 @@ int i;
 		FFT_PLOT_MY-1,
 		COLOR_TEXT_PRIM
 	);
-
-	/*
-	textout_ex(background,
-		font,
-		"Hz",
-		FFT_PLOT_MX + 30,
-		FFT_PLOT_MY + 10,
-		COLOR_TEXT_PRIM,
-		COLOR_BKG);
-	*/
 }
 
 /**
@@ -262,7 +239,7 @@ int i;
 	pixel_increase	= FFT_PLOT_WIDTH / FFT_PLOT_X_TICKS;
 	freq_increase	= audio_get_fft_rrate() / 2 / FFT_PLOT_X_TICKS;
 
-	for(i = 0; i <= FFT_PLOT_X_TICKS; ++i)
+	for (i = 0; i <= FFT_PLOT_X_TICKS; ++i)
 	{
 		// Draw the tick
 		rectfill(background,
@@ -323,18 +300,13 @@ static inline void draw_fft_scales(BITMAP* background)
 static inline void draw_time_vertical_scale(BITMAP* background)
 {
 int pixel_increase; // The number of pixels between each tick
-// int freq_increase;	// The frequency span between two ticks
 int pixel_offset;	// The column where to print the label
-// int freq_next;		// The next label to print
-// char buffer[6];		// Buffer used to print text on the background
 int i;
 
 	pixel_offset	= 0;
-	// freq_next		= 0;
 	pixel_increase	= (TIME_PLOT_HEIGHT-2) / TIME_PLOT_Y_TICKS;
-	// freq_increase	= audio_get_TIME_rrate() / 2 / TIME_PLOT_Y_TICKS;
 
-	for(i = 0; i <= TIME_PLOT_Y_TICKS; ++i)
+	for (i = 0; i <= TIME_PLOT_Y_TICKS; ++i)
 	{
 		// Draw the tick
 		rectfill(background,
@@ -345,20 +317,7 @@ int i;
 			COLOR_TEXT_PRIM
 		);
 
-		// sprintf(buffer, "%d", freq_next);
-		/*
-		textout_centre_ex(background,
-			font,
-			buffer,
-			TIME_PLOT_X	+ pixel_offset,
-			TIME_PLOT_MY	+ 10,
-			COLOR_TEXT_PRIM,
-			COLOR_BKG
-		);
-		*/
-
 		pixel_offset += pixel_increase;
-		// freq_next += freq_increase;
 	}
 
 	rectfill(background,
@@ -368,16 +327,6 @@ int i;
 		TIME_PLOT_MY-1,
 		COLOR_TEXT_PRIM
 	);
-
-	/*
-	textout_ex(background,
-		font,
-		"Hz",
-		TIME_PLOT_MX + 30,
-		TIME_PLOT_MY + 10,
-		COLOR_TEXT_PRIM,
-		COLOR_BKG);
-	*/
 }
 
 /**
@@ -391,12 +340,11 @@ char buffer[6];		// Buffer used to print text on the background
 int i;
 
 	pixel_offset	= TIME_PLOT_WIDTH-1;
-	// This is a little more tricky, I want to print one tick per second backwards,
-	// until I reach the maximum number of ticks
+	// This is a little more tricky, I want to print one tick per second
+	// backwards, until I reach the maximum number of ticks
 	pixel_increase = TIME_ACTUAL_SPEED * (1000 / TASK_GUI_PERIOD);
 
-
-	for(i = 0; pixel_offset >= 0; --i)
+	for (i = 0; pixel_offset >= 0; --i)
 	{
 		// Draw the tick
 		rectfill(background,
@@ -462,7 +410,7 @@ static inline int static_interface_init()
 BITMAP* 		bitmap_ptr;		// Temporary pointer to a BITMAP
 gui_static_t	static_screen;	// Holds all the static interface elements
 
-	if(gui_state.initialized)
+	if (gui_state.initialized)
 		return 0;
 
 	bitmap_ptr = load_bitmap(BITMAP_BACKGROUND_PATH, NULL);
@@ -573,7 +521,8 @@ int		value;		// Value where to store
  */
 static inline void draw_side_element_midi(int index)
 {
-int posx, posy;	// Starting point where to draw the given element
+int posx, posy;		// Starting point where to draw the given element
+
 	posx = SIDE_X;
 	posy = SIDE_Y + index * SIDE_ELEM_MY;
 
@@ -720,11 +669,11 @@ int i;
 		average = fft_average_to_height(average);
 
 		rectfill(gui_state.virtual_screen,
-				 FFT_PLOT_X		+ pixel_offset,
-				 FFT_PLOT_MY	- average - 1,
-				 FFT_PLOT_X		+ pixel_offset + 1,
-				 FFT_PLOT_MY	- 1,
-				 COLOR_ACCENT);
+			FFT_PLOT_X		+ pixel_offset,
+			FFT_PLOT_MY	- average - 1,
+			FFT_PLOT_X		+ pixel_offset + 1,
+			FFT_PLOT_MY	- 1,
+			COLOR_ACCENT);
 	}
 }
 
@@ -840,15 +789,16 @@ int res;
  */
 static inline void draw_amplitude()
 {
-static BITMAP *amplitude_bitmap = NULL;	// Static object used to store the
+static BITMAP*	amplitude_bitmap = NULL;// Static object used to store the
 										// previous plot, so that it can be
 										// later re-plotted on the next
 										// execution shifted by TIME_SPEED
 										// pixels
-
-int amplitude;			// The height of the most recent computed amplitude
-
-static bool skip = true;
+static bool		skip = true;			// Used to skip printing every frame a
+										// new bar if TIME_SHOULD_SKIP is
+										// enabled (slows down the plot)
+int				amplitude;				// The height of the most recent
+										// computed amplitude
 
 	// Static initialization on first run
 	if (amplitude_bitmap == NULL)
@@ -881,7 +831,6 @@ static bool skip = true;
 			return;
 		}
 	}
-
 
 	// Copy back the plot on the virtual screen from the history bitmap, which
 	// is already shifted by TIME_SPEED amount.
@@ -1000,7 +949,7 @@ int count;
 int key;
 int scancode;
 
-	for(count = 0; keypressed() && count < MAX_KEY_COMMANDS; count++)
+	for (count = 0; keypressed() && count < MAX_KEY_COMMANDS; count++)
 	{
 		key = readkey();
 
@@ -1010,7 +959,7 @@ int scancode;
 			handle_num_key(scancode - KEY_0);
 		else
 		{
-			switch(key >> 8)
+			switch (key >> 8)
 			{
 			case KEY_Q:
 				// Request main module to terminate the current session
@@ -1057,10 +1006,12 @@ static inline int get_element_id(int x, int y)
  */
 static inline button_id_t get_button_id(int x, int y)
 {
-int relx, rely;					// Position relative to the element the mouse is in
-button_id_t id = BUTTON_INVALID;// The type of the selected button
+int			relx, rely;		// Position relative to the element the mouse is in
+button_id_t id;				// The type of the selected button
 
-	if(!is_mouse_in_side(x, y)) return BUTTON_INVALID;
+	id = BUTTON_INVALID;
+
+	if (!is_mouse_in_side(x, y)) return BUTTON_INVALID;
 
 	relx = x - SIDE_X;
 	rely = (y - SIDE_Y) % SIDE_ELEM_HEIGHT;
@@ -1108,7 +1059,7 @@ button_id_t id = BUTTON_INVALID;// The type of the selected button
  */
 static inline void handle_click(int button_id, int element_id)
 {
-	switch(button_id)
+	switch (button_id)
 	{
 	case BUTTON_PLAY:
 		audio_file_play(element_id);
@@ -1166,7 +1117,7 @@ static struct timespec next_click_time;
 									// accepted
 static struct timespec current_time;// The current time at this iteration
 
-	if(poll_mouse() || !mouse_on_screen()) return;	// No mouse driver installed
+	if (poll_mouse() || !mouse_on_screen()) return;	// No mouse driver installed
 													// or mouse is not on screen
 
 	// Position is first copied to a local variable to prevent concurrency errors
@@ -1244,7 +1195,7 @@ int gui_graphic_mode_init()
 int err;
 
 	err = set_gfx_mode(GFX_AUTODETECT_WINDOWED, WIN_MX, WIN_MY, 0, 0);
-	if(err) return err;
+	if (err) return err;
 
 	set_close_button_callback(close_button_proc);
 
@@ -1294,22 +1245,14 @@ int err;
 
 void* gui_task(void* arg)
 {
-ptask_t*	tp;			// task pointer
-// int			task_id;	// task identifier
+ptask_t*	tp;
+int			err;
 
-// Local variables
-int err;
+	tp	= STATIC_CAST(ptask_t*, arg);
 
-	tp = STATIC_CAST(ptask_t*, arg);
-	// task_id = ptask_get_id(tp);
-
-	// Variables initialization and initial computation
-
-	err = gui_graphic_mode_init();
+	err	= gui_graphic_mode_init();
 	if (err)
 		abort_on_error("Could not initialize graphic mode.");
-
-	draw_background();
 
 	ptask_start_period(tp);
 
@@ -1329,20 +1272,12 @@ int err;
 	return NULL;
 }
 
-
-
 void* user_interaction_task(void* arg)
 {
-ptask_t*	tp;			// task pointer
-// int			task_id;	// task identifier
-
-// Local variables
-int err;
+ptask_t*	tp;
+int			err;
 
 	tp = STATIC_CAST(ptask_t*, arg);
-	// task_id = ptask_get_id(tp);
-
-	// Variables initialization and initial computation
 
 	err = install_keyboard();
 	if (err)
@@ -1380,8 +1315,8 @@ int err;
 
 	ptask_mutex_lock(&gui_state.mutex);
 
-	gui_state.mouse_initialized = false;
-	gui_state.mouse_shown = false;
+	gui_state.mouse_initialized	= false;
+	gui_state.mouse_shown		= false;
 
 	ptask_mutex_unlock(&gui_state.mutex);
 

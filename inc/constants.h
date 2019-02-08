@@ -213,14 +213,12 @@
 //@{
 
 
-#define FOOTER_WIDTH	(WIN_WIDTH)	///< Footer width
-#define FOOTER_HEIGHT	(48)		///< Footer height
-
-#define FOOTER_X	(WIN_X)			///< Footer position x
-#define FOOTER_Y	(WIN_MY-FOOTER_HEIGHT)
-									///< Footer position y
-#define FOOTER_MX	(WIN_MX)		///< Footer max x
-#define FOOTER_MY	(WIN_MY)		///< Footer max y
+#define FOOTER_WIDTH	(WIN_WIDTH)				///< Footer width
+#define FOOTER_HEIGHT	(48)					///< Footer height
+#define FOOTER_X		(WIN_X)					///< Footer position x
+#define FOOTER_Y		(WIN_MY-FOOTER_HEIGHT)	///< Footer position y
+#define FOOTER_MX		(WIN_MX)				///< Footer max x
+#define FOOTER_MY		(WIN_MY)				///< Footer max y
 
 /*
 	 __________________________________________________________
@@ -250,7 +248,6 @@
 #define SIDE_Y				(0)					///< Side panel position y
 #define SIDE_MX				(WIN_MX)			///< Side panel max x
 #define SIDE_MY				(FOOTER_Y)			///< Side panel max y
-
 #define SIDE_WIDTH			(SIDE_MX-SIDE_X)	///< Side panel width
 #define SIDE_HEIGHT			(SIDE_MY-SIDE_Y)	///< Side panel height
 
@@ -258,16 +255,15 @@
 												///< The maximum number of
 												///< elements in the side panel
 
-#define SIDE_ELEM_X			(SIDE_X)		///< Side panel element position x
+#define SIDE_ELEM_X			(SIDE_X)			///< Side panel element position x
 
-#define SIDE_ELEM_WIDTH		(SIDE_WIDTH)	///< Side panel element width
+#define SIDE_ELEM_WIDTH		(SIDE_WIDTH)		///< Side panel element width
 #define SIDE_ELEM_HEIGHT	(SIDE_HEIGHT/SIDE_NUM_ELEMENTS)
-											///< Side panel element height
+												///< Side panel element height
 
-#define SIDE_ELEM_MX		(SIDE_MX-SIDE_X)
-											///< Side panel element max x
+#define SIDE_ELEM_MX		(SIDE_MX-SIDE_X)	///< Side panel element max x
 #define SIDE_ELEM_MY		(SIDE_ELEM_X + SIDE_ELEM_HEIGHT)
-											///< Side panel element max y
+												///< Side panel element max y
 
 #define SIDE_ELEM_NAME_X	(SIDE_ELEM_X + 12)
 											///< Side panel element name label
@@ -281,41 +277,41 @@
 #define SIDE_ELEM_FRQ_LABEL_X	(12+256-8)	///< Side panel element frequency label relative x
 #define SIDE_ELEM_FRQ_LABEL_Y	(40)		///< Side panel element frequency label relative y
 
-#define SIDE_ELEM_VAL_Y		(54)			///< Side panel element text value y
+#define SIDE_ELEM_VAL_Y			(54)		///< Side panel element text value y
 
-#define SIDE_ELEM_VOL_X		(SIDE_ELEM_X + 64)		///< Side element volume value x
-#define SIDE_ELEM_PAN_X		(SIDE_ELEM_X + 64+128)	///< Side element panning value x
-#define SIDE_ELEM_FRQ_X		(SIDE_ELEM_X + 64+256)	///< Side element frequency value x
+#define SIDE_ELEM_VOL_X	(SIDE_ELEM_X + 64)		///< Side element volume value x
+#define SIDE_ELEM_PAN_X	(SIDE_ELEM_X + 64+128)	///< Side element panning value x
+#define SIDE_ELEM_FRQ_X	(SIDE_ELEM_X + 64+256)	///< Side element frequency value x
 
 // BUTTONS, NOTICE: these values are relative to the elem position!
 
-#define BUTTON_PLAY_X		(360)		///< Button play relative x
-#define BUTTON_PLAY_Y		(10)		///< Button play relative y
-#define BUTTON_PLAY_MX		(374)		///< Button play relative mx
-#define BUTTON_PLAY_MY		(30)		///< Button play relative my
+#define BUTTON_PLAY_X		(360)			///< Button play relative x
+#define BUTTON_PLAY_Y		(10)			///< Button play relative y
+#define BUTTON_PLAY_MX		(374)			///< Button play relative mx
+#define BUTTON_PLAY_MY		(30)			///< Button play relative my
 
 #define BUTTON_ROW_Y		(50)
-										///< Buttons row position y
-										///< Used in CHECK_BUTTON_POSX() and
-										///< CHECK_BUTTON_POSY() macros
+											///< Buttons row position y
+											///< Used in CHECK_BUTTON_POSX() and
+											///< CHECK_BUTTON_POSY() macros
 #define BUTTON_ROW_MY		(66)
-										///< Buttons row max y
-										///< Used in CHECK_BUTTON_POSX() and
-										///< CHECK_BUTTON_POSY() macros
+											///< Buttons row max y
+											///< Used in CHECK_BUTTON_POSX() and
+											///< CHECK_BUTTON_POSY() macros
 
-#define BUTTON_VOL_DOWN_X	(40)		///< Button volume down position x
-#define BUTTON_VOL_DOWN_MX	(56)		///< Button volume down max x
-#define BUTTON_PAN_DOWN_X	(40 + 128)	///< Button panning down position x
-#define BUTTON_PAN_DOWN_MX	(56 + 128)	///< Button panning down max x
-#define BUTTON_FRQ_DOWN_X	(40 + 256)	///< Button frequency down position x
-#define BUTTON_FRQ_DOWN_MX	(56 + 256)	///< Button frequency down max x
+#define BUTTON_VOL_DOWN_X	(40)			///< Button volume down position x
+#define BUTTON_VOL_DOWN_MX	(56)			///< Button volume down max x
+#define BUTTON_PAN_DOWN_X	(40 + 128)		///< Button panning down position x
+#define BUTTON_PAN_DOWN_MX	(56 + 128)		///< Button panning down max x
+#define BUTTON_FRQ_DOWN_X	(40 + 256)		///< Button frequency down position x
+#define BUTTON_FRQ_DOWN_MX	(56 + 256)		///< Button frequency down max x
 
-#define BUTTON_VOL_UP_X		(102)		///< Button volume up position x
-#define BUTTON_VOL_UP_MX	(118)		///< Button volume up max x
-#define BUTTON_PAN_UP_X		(102 + 128)	///< Button panning up position x
-#define BUTTON_PAN_UP_MX	(118 + 128)	///< Button panning up max x
-#define BUTTON_FRQ_UP_X		(102 + 256)	///< Button frequency up position x
-#define BUTTON_FRQ_UP_MX	(118 + 256)	///< Button frequency up max x
+#define BUTTON_VOL_UP_X		(102)			///< Button volume up position x
+#define BUTTON_VOL_UP_MX	(118)			///< Button volume up max x
+#define BUTTON_PAN_UP_X		(102 + 128)		///< Button panning up position x
+#define BUTTON_PAN_UP_MX	(118 + 128)		///< Button panning up max x
+#define BUTTON_FRQ_UP_X		(102 + 256)		///< Button frequency up position x
+#define BUTTON_FRQ_UP_MX	(118 + 256)		///< Button frequency up max x
 
 /// Concatenates two strings to form another macro.
 #define PASTER(button, dim) BUTTON_ ## button ## _ ## dim
@@ -365,7 +361,7 @@
  */
 //@{
 
-#define FFT_P		(PADDING)			///< FFT panel padding
+#define FFT_P		(PADDING)				///< FFT panel padding
 #define FFT_X		(WIN_X + FFT_P)			///< FFT panel position x
 #define FFT_Y		(WIN_Y + FFT_P)			///< FFT panel position y
 #define FFT_MX		(SIDE_X - FFT_P)		///< FFT panel max x
@@ -504,14 +500,16 @@
 /// Maximum number of tasks which may be running at any time
 #define	TASK_NUM		(TASK_ALS_FIRST + AUDIO_MAX_FILES)
 
-///
+/// A zero wcet means that the value is unknown
 #define WCET_UNKNOWN	(0)
 
 #ifdef NDEBUG
-	#define GET_PRIO(prio) (prio)	///< If not in debug mode, this does nothing
+/// If not in debug mode, this does nothing
+#define GET_PRIO(prio) (prio)
 #else
-	#define GET_PRIO(prio) (0)		///< In debug mode real time scheduling is
-#endif								///< disabled, so priority must be zero
+/// In debug mode real-time scheduling is disabled, so priority must be zero
+#define GET_PRIO(prio) (0)
+#endif
 
 // Tasks priorities are chosen following RM guidelines, even if the UI task has
 // a lower priority than the microphone tasks because the responsiveness to the
@@ -522,7 +520,7 @@
 
 #define TASK_GUI_WCET		(WCET_UNKNOWN)
 #define TASK_GUI_PERIOD		(16)	///< A little more than 60 fps
-// #define TASK_GUI_PERIOD		(30)	///< A little more than 30 fps
+// #define TASK_GUI_PERIOD	(30)	///< A little more than 30 fps
 #define TASK_GUI_DEADLINE	(TASK_GUI_PERIOD)
 #define TASK_GUI_PRIORITY	(1)
 									///< Lowest priority, missing a frame is not

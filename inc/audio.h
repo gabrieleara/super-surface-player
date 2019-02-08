@@ -5,6 +5,12 @@
  * @author Gabriele Ara
  * @date 2019/01/17
  *
+ * This module handles all interactions between the program and audio services
+ * provided either by Allegro or directly via the ALSA library, both for
+ * recording and playback purposes.
+ * It also uses FFTW library to compute FFT/IFFT of the acquired audio samples
+ * and publishes results on CAB structures that can be accessed via getters.
+ *
  * Except the ones that shall be called from a single-thread environment,
  * functions are safe from a concurrency point of view.
  *
@@ -17,16 +23,15 @@
 //                             PUBLIC DATA TYPES
 // -----------------------------------------------------------------------------
 
-
 /**
  * The state associated with an audio entry (since they are statically
  * allocated).
  */
 typedef enum __AUDIO_TYPE_ENUM
 {
-	AUDIO_TYPE_INVALID = -1, ///< Invalid audio file entry
-	AUDIO_TYPE_SAMPLE,       ///< Sample-based audio file entry (wav)
-	AUDIO_TYPE_MIDI,         ///< MIDI audio file entry
+	AUDIO_TYPE_INVALID = -1,	///< Invalid audio file entry
+	AUDIO_TYPE_SAMPLE,			///< Sample-based audio file entry (wav)
+	AUDIO_TYPE_MIDI,			///< MIDI audio file entry
 } audio_type_t;
 
 // -----------------------------------------------------------------------------

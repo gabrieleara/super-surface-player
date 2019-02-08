@@ -6,7 +6,8 @@
  * @date 2019/01/17
  *
  * Since the video module is responsible for everything printed on the screen
- * and to perform interaction with user commands by querying the modules, it is mostly self-contained.
+ * and to perform interaction with user commands by querying the modules, it is
+ * mostly self-contained.
  * That's why only these few functions are exposed as public.
  *
  */
