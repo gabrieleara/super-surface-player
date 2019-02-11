@@ -31,7 +31,7 @@
 										///< will depend on AUDIO_PADDING_RATIO
 										///< constant value
 
-#define AUDIO_PADDING_RATIO		(2)
+#define AUDIO_PADDING_RATIO		(4)
 										///< The ratio between the number of
 										///< frames captured and the number of
 										///< frames after padding is added
@@ -44,7 +44,7 @@
 /// Desired number of frames contained in an audio sample.
 /// It should be a power of two to make the FFT computation way faster.
 /// NOTICE: the bigger this number, the bigger the latency.
-#define AUDIO_DESIRED_FRAMES	(8*1024)
+#define AUDIO_DESIRED_FRAMES	(4*1024)
 
 /// Increase this value to try to decrease the latency of the system, at the
 /// cost of additional task wakeups.
