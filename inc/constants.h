@@ -64,11 +64,17 @@
 /// constant.
 #define AUDIO_LATENCY_REDUCER	(8)
 
+/// The minimum delay between two samples to be recognized as the same sound,
+/// in milliseconds. Increase this when you experience overlapping of the same
+/// sound because of sustained input.
+/// Minimum value is zero.
+#define AUDIO_ANALYSIS_DELAY_MS	(500)
+
 /// The amplitude which corresponds to the maximum height
-#define TIME_MAX_AMPLITUDE	(1000000000/2)
+#define TIME_MAX_AMPLITUDE		(1000000000/2)
 
 /// The scaling of the FFT plot with respect to the computed energy value
-#define FFT_PLOT_SCALING			(5.)
+#define FFT_PLOT_SCALING		(5.)
 
 /// Uncomment this line to make the microphone task an aperiodic task, waking
 /// it up using another faster task

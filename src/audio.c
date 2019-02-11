@@ -2008,8 +2008,12 @@ int					err;
 
 			if (fabs(correlation) > AUDIO_THRESHOLD)
 			{
-				// We start every time a new execution
+				// We start a new execution
 				audio_file_play(file_index);
+
+				// We then move the last_timestamp forward in time to avoid
+				// analyzing too often the input
+				time_add_ms(&last_timestamp, AUDIO_ANALYSIS_DELAY_MS);
 			}
 		}
 
